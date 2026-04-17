@@ -9,7 +9,7 @@
  * @section concurrency Concurrency
  * WiFiEvent() is called from a separate FreeRTOS task.  Access to shared globals
  * (ssid, pwd, checkWifiConnectionFlag, debugBuffer*) from that context is not
- * mutex-protected — see BUG-06.  checkWifiConnectionFlag is declared volatile as a
+ * mutex-protected.  checkWifiConnectionFlag is declared volatile as a
  * minimal guard; full correctness would require a FreeRTOS mutex.
  *
  * @section build Build
@@ -105,7 +105,7 @@ WiFiServer server(80);
 unsigned long startOfMainLoopMillis, lastMillis60s, startPumpMillis, lastPumpStartMillis, refreshPagesMillis;
 int page, subpage;
 // checkWifiConnectionFlag is written from the WiFiEvent FreeRTOS task; volatile prevents
-// the compiler from caching the value in a register (BUG-06 partial mitigation).
+// the compiler from caching the value in a register.
 volatile bool checkWifiConnectionFlag = true;
 bool humidityThresholdHysteresisFalling, serialDebug, serialDebugActive;
 String ssid, pwd, emptyWaterURL, reportURL, stylesheet;
@@ -119,53 +119,53 @@ int debugBufferIndexNextEmpty, debugBufferIndexLastShown, debugLevel;
 
 // Variadic template functions
 template<typename... Args> void debug(const int level, Args... args) {
-  if (serialDebug)
-    Serial.print(args...);
-  if (level <= debugLevel)
-    (debugBufferLine += String(args), ...);
+	if (serialDebug)
+		Serial.print(args...);
+	if (level <= debugLevel)
+		(debugBufferLine += String(args), ...);
 }
 template<typename... Args> void debugln(const int level, Args... args) {
-  if (serialDebug)
-    Serial.println(args...);
-  if (level <= debugLevel) {
-    (debugBufferLine += String(args), ...);
-    char sign;
-    switch (level) {
-      case DEBUG_ERROR:
-        sign = 'E';
-        break;
-      case DEBUG_WARN:
-        sign = 'W';
-        break;
-      case DEBUG_INFO:
-        sign = 'I';
-        break;
-      case DEBUG_VERBOSE:
-        sign = 'V';
-        break;
-      case DEBUG_DEBUG:
-        sign = 'D';
-        break;
-      case DEBUG_TRACE:
-        sign = 'T';
-        break;
-      default:
-        sign = '?';
-    }
-    unsigned long now = (millis() + 500) / 1000;  // Seconds
-    int d = now / 86400, h = (now / 3600) % 24, m = (now / 60) % 60, s = now % 60;
-    struct tm timeinfo;
-    char buffer[20];
-    if (getLocalTime(&timeinfo))
-      strftime(buffer, sizeof(buffer), "%d.%m.%y %H:%M:%S", &timeinfo);
-    else
-      sprintf(buffer, "%8d %02d:%02d:%02d", d, h, m, s);
-    debugBufferArray[debugBufferIndexNextEmpty++] = String(buffer) + " [" + sign + "] " + debugBufferLine;
-    debugBufferLine = "";
-    debugBufferIndexNextEmpty %= DEBUG_BUFFER_SIZE;
-    if (debugBufferIndexLastShown == debugBufferIndexNextEmpty)  // If circular buffer is full release oldest entry
-      debugBufferIndexLastShown = (debugBufferIndexLastShown + 1) % DEBUG_BUFFER_SIZE;
-  }
+	if (serialDebug)
+		Serial.println(args...);
+	if (level <= debugLevel) {
+		(debugBufferLine += String(args), ...);
+		char sign;
+		switch (level) {
+			case DEBUG_ERROR:
+				sign = 'E';
+				break;
+			case DEBUG_WARN:
+				sign = 'W';
+				break;
+			case DEBUG_INFO:
+				sign = 'I';
+				break;
+			case DEBUG_VERBOSE:
+				sign = 'V';
+				break;
+			case DEBUG_DEBUG:
+				sign = 'D';
+				break;
+			case DEBUG_TRACE:
+				sign = 'T';
+				break;
+			default:
+				sign = '?';
+		}
+		unsigned long now = (millis() + 500) / 1000;  // Seconds
+		int d = now / 86400, h = (now / 3600) % 24, m = (now / 60) % 60, s = now % 60;
+		struct tm timeinfo;
+		char buffer[20];
+		if (getLocalTime(&timeinfo))
+			strftime(buffer, sizeof(buffer), "%d.%m.%y %H:%M:%S", &timeinfo);
+		else
+			sprintf(buffer, "%8d %02d:%02d:%02d", d, h, m, s);
+		debugBufferArray[debugBufferIndexNextEmpty++] = String(buffer) + " [" + sign + "] " + debugBufferLine;
+		debugBufferLine = "";
+		debugBufferIndexNextEmpty %= DEBUG_BUFFER_SIZE;
+		if (debugBufferIndexLastShown == debugBufferIndexNextEmpty)  // If circular buffer is full release oldest entry
+			debugBufferIndexLastShown = (debugBufferIndexLastShown + 1) % DEBUG_BUFFER_SIZE;
+	}
 }
 
 /**
@@ -179,224 +179,246 @@ template<typename... Args> void debugln(const int level, Args... args) {
  * @return Mapped value.  Not clamped — callers must validate ranges.
  */
 double mapf(const double x, const double in_min, const double in_max, const double out_min, const double out_max) {
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
 void setup() {
-  // Serial.begin(115200);      // DEBUG
-  // serialDebug = true;        // DEBUG
-  // serialDebugActive = true;  // DEBUG
+	// Serial.begin(115200);      // DEBUG
+	// serialDebug = true;        // DEBUG
+	// serialDebugActive = true;  // DEBUG
 
-  analogReadResolution(10);  // Backwards compatibility: 0-1023
-  pinMode(LED_BUILTIN, OUTPUT);
+	analogReadResolution(10);  // Backwards compatibility: 0-1023
+	pinMode(LED_BUILTIN, OUTPUT);
 
-  pinMode(PUMP_ACTIVE_GPIO_NUMBER, OUTPUT);
-  digitalWrite(PUMP_ACTIVE_GPIO_NUMBER, HIGH);  // The used relais is LOW active!
+	pinMode(PUMP_ACTIVE_GPIO_NUMBER, OUTPUT);
+	digitalWrite(PUMP_ACTIVE_GPIO_NUMBER, HIGH);  // The used relais is LOW active!
 
-  // IMP-02: check NVS initialisation; log on failure and continue with defaults.
-  if (!prefs.begin("p")) {
-    debugln(DEBUG_ERROR, "NVS init failed, all settings will use defaults");
-  }
+	// IMP-02: check NVS initialisation; log on failure and continue with defaults.
+	if (!prefs.begin("p")) {
+		debugln(DEBUG_ERROR, "NVS init failed, all settings will use defaults");
+	}
 
-  int numberOfActiveSensors = 0;
-  overallAverageHumidity = 0;
-  for (int v = 0; v < sensorPortTotalNumber; v++) {
-    char portname[10];  // gpioXX\0 gpiodryXX\0 gpiowetXX\0
-    (String("gpio") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
-    activeSensor[v] = prefs.getBool(portname);
-    numberOfActiveSensors += (activeSensor[v] ? 1 : 0);
-    debugln(DEBUG_VERBOSE, String("GPIO") + sensorPort[v] + " is " + (activeSensor[v] ? " en" : "dis") + "abled for a humidity sensor");
+	int numberOfActiveSensors = 0;
+	overallAverageHumidity = 0;
+	for (int v = 0; v < sensorPortTotalNumber; v++) {
+		char portname[10];  // gpioXX\0 gpiodryXX\0 gpiowetXX\0
+		(String("gpio") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
+		activeSensor[v] = prefs.getBool(portname);
+		numberOfActiveSensors += (activeSensor[v] ? 1 : 0);
+		debugln(DEBUG_VERBOSE, String("GPIO") + sensorPort[v] + " is " + (activeSensor[v] ? " en" : "dis") + "abled for a humidity sensor");
 
-    (String("gpiodry") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
-    if (prefs.getInt(portname) == 0)
-      prefs.putInt(portname, 670);
-    sensorDryHumidity[v] = prefs.getInt(portname);
+		(String("gpiodry") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
+		if (prefs.getInt(portname) == 0)
+			prefs.putInt(portname, 670);
+		sensorDryHumidity[v] = prefs.getInt(portname);
 
-    (String("gpiowet") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
-    if (prefs.getInt(portname) == 0)
-      prefs.putInt(portname, 260);
-    sensorWetHumidity[v] = prefs.getInt(portname);
+		(String("gpiowet") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
+		if (prefs.getInt(portname) == 0)
+			prefs.putInt(portname, 260);
+		sensorWetHumidity[v] = prefs.getInt(portname);
 
-    if (activeSensor[v]) {
-      for (int t = 0; t < 20; t++) {
-        averageHumidity[v] = analogRead(sensorPort[v]);  // Preload with current values
-        delay(5);
-      }
-      overallAverageHumidity += mapf(averageHumidity[v], sensorDryHumidity[v], sensorWetHumidity[v], 0, 100);
-    }
-  }
-  // BUG-05 fix: guard against division by zero on first boot before any sensor is configured.
-  if (numberOfActiveSensors > 0)
-    overallAverageHumidity /= numberOfActiveSensors;
+		if (activeSensor[v]) {
+			for (int t = 0; t < 20; t++) {
+				int raw = analogRead(sensorPort[v]);
+				if (raw >= 0 && raw <= 1023) {
+					averageHumidity[v] = raw;  // Preload with current values
+				}
+				delay(5);
+			}
+			overallAverageHumidity += mapf(averageHumidity[v], sensorDryHumidity[v], sensorWetHumidity[v], 0, 100);
+		}
+	}
+	if (numberOfActiveSensors > 0) {
+		overallAverageHumidity /= numberOfActiveSensors;
+	} else {
+		overallAverageHumidity = 100;  // Fallback to wet if no sensors so we don't flood the room
+	}
 
-  ssid = prefs.getString("ssid");
-  pwd = prefs.getString("password");
-  humidityThresholdUpper = prefs.getInt("threshold1");
-  humidityThresholdLower = prefs.getInt("threshold2");
-  pumpRuntime1InSeconds = prefs.getDouble("pumptime1");
-  pumpDelay1InMinutes = prefs.getInt("pumpdelay1");
-  pumpRuntimeNInSeconds = prefs.getDouble("pumptimeN");
-  pumpDelayNInMinutes = prefs.getInt("pumpdelayN");
-  dryWetPumpBorderValue = prefs.getInt("drypump");
-  emptyWaterURL = prefs.getString("emptyUrl");
-  reportURL = prefs.getString("reportURL");
-  debugLevel = prefs.getInt("debugLevel");
-  stylesheet = prefs.getString("stylesheet");
-  if (numberOfActiveSensors == 0) {
-    debugln(DEBUG_INFO, "No GPIO enabled, activating first in line");
-    char portname[7];  // gpioXX\0
-    (String("gpio") + String(sensorPort[0])).toCharArray(portname, sizeof(portname));
-    prefs.putBool(portname, true);
-    activeSensor[0] = prefs.getBool(portname);
-  }
-  if (humidityThresholdUpper == 0) {  // Default values in case no Settings have been saved, yet
-    humidityThresholdUpper = 70;      // Dry: ~673, Submerged: ~264 absolute, No sensor: 0, My plant: 380(71%)
-    prefs.putInt("threshold1", humidityThresholdUpper);
-  }
-  if (humidityThresholdLower == 0) {  // Default values in case no Settings have been saved, yet
-    humidityThresholdLower = 50;      // Dry: ~673, Submerged: ~264 absolute
-    prefs.putInt("threshold2", humidityThresholdLower);
-  }
-  if (isnan(pumpRuntime1InSeconds)) {
-    pumpRuntime1InSeconds = 7.0;
-    prefs.putDouble("pumptime1", pumpRuntime1InSeconds);
-  }
-  if (pumpDelay1InMinutes == 0) {
-    pumpDelay1InMinutes = 360;
-    prefs.putInt("pumpdelay1", pumpDelay1InMinutes);
-  }
-  if (isnan(pumpRuntimeNInSeconds)) {
-    pumpRuntimeNInSeconds = 0.8;
-    prefs.putDouble("pumptimeN", pumpRuntimeNInSeconds);
-  }
-  if (pumpDelayNInMinutes == 0) {
-    pumpDelayNInMinutes = 180;
-    prefs.putInt("pumpdelayN", pumpDelayNInMinutes);
-  }
-  if (dryWetPumpBorderValue == 0) {
-    dryWetPumpBorderValue = 250;  // Dry: ~130 mA, Submerged: ~430 Ah // TODO
-    prefs.putInt("drypump", dryWetPumpBorderValue);
-  }
-  if (emptyWaterURL.isEmpty()) {  // BUG-03 fix: .isEmpty() instead of == NULL
-    emptyWaterURL = DEFAULT_URL_EMPTY;
-    prefs.putString("emptyUrl", emptyWaterURL);
-  }
-  if (reportURL.isEmpty()) {  // BUG-03 fix: .isEmpty() instead of == NULL
-    reportURL = DEFAULT_URL_STATUS;
-    prefs.putString("reportURL", reportURL);
-  }
-  if (debugLevel < DEBUG_ERROR) {
-    debugLevel = DEBUG_INFO;
-    prefs.putInt("debugLevel", debugLevel);
-  }
-  if (stylesheet.isEmpty()) {  // BUG-03 fix: .isEmpty() instead of == NULL
-    stylesheet = DEFAULT_STYLESHEET;
-    prefs.putString("stylesheet", stylesheet);
-  }
+	ssid = prefs.getString("ssid");
+	pwd = prefs.getString("password");
+	humidityThresholdUpper = prefs.getInt("threshold1");
+	humidityThresholdLower = prefs.getInt("threshold2");
+	pumpRuntime1InSeconds = prefs.getDouble("pumptime1");
+	pumpDelay1InMinutes = prefs.getInt("pumpdelay1");
+	pumpRuntimeNInSeconds = prefs.getDouble("pumptimeN");
+	pumpDelayNInMinutes = prefs.getInt("pumpdelayN");
+	dryWetPumpBorderValue = prefs.getInt("drypump");
+	emptyWaterURL = prefs.getString("emptyUrl");
+	reportURL = prefs.getString("reportURL");
+	debugLevel = prefs.getInt("debugLevel");
+	stylesheet = prefs.getString("stylesheet");
+	if (numberOfActiveSensors == 0) {
+		debugln(DEBUG_INFO, "No GPIO enabled, activating first in line");
+		char portname[7];  // gpioXX\0
+		(String("gpio") + String(sensorPort[0])).toCharArray(portname, sizeof(portname));
+		prefs.putBool(portname, true);
+		activeSensor[0] = prefs.getBool(portname);
+	}
+	if (humidityThresholdUpper == 0) {  // Default values in case no Settings have been saved, yet
+		humidityThresholdUpper = 70;      // Dry: ~673, Submerged: ~264 absolute, No sensor: 0, My plant: 380(71%)
+		prefs.putInt("threshold1", humidityThresholdUpper);
+	}
+	if (humidityThresholdLower == 0) {  // Default values in case no Settings have been saved, yet
+		humidityThresholdLower = 50;      // Dry: ~673, Submerged: ~264 absolute
+		prefs.putInt("threshold2", humidityThresholdLower);
+	}
+	if (isnan(pumpRuntime1InSeconds)) {
+		pumpRuntime1InSeconds = 7.0;
+		prefs.putDouble("pumptime1", pumpRuntime1InSeconds);
+	}
+	if (pumpDelay1InMinutes == 0) {
+		pumpDelay1InMinutes = 360;
+		prefs.putInt("pumpdelay1", pumpDelay1InMinutes);
+	}
+	if (isnan(pumpRuntimeNInSeconds)) {
+		pumpRuntimeNInSeconds = 0.8;
+		prefs.putDouble("pumptimeN", pumpRuntimeNInSeconds);
+	}
+	if (pumpDelayNInMinutes == 0) {
+		pumpDelayNInMinutes = 180;
+		prefs.putInt("pumpdelayN", pumpDelayNInMinutes);
+	}
+	if (dryWetPumpBorderValue == 0) {
+		dryWetPumpBorderValue = 250;  // Dry: ~130 mA, Submerged: ~430 Ah // TODO
+		prefs.putInt("drypump", dryWetPumpBorderValue);
+	}
+	if (emptyWaterURL.isEmpty()) {
+		emptyWaterURL = DEFAULT_URL_EMPTY;
+		prefs.putString("emptyUrl", emptyWaterURL);
+	}
+	if (reportURL.isEmpty()) {
+		reportURL = DEFAULT_URL_STATUS;
+		prefs.putString("reportURL", reportURL);
+	}
+	if (debugLevel < DEBUG_ERROR) {
+		debugLevel = DEBUG_INFO;
+		prefs.putInt("debugLevel", debugLevel);
+	}
+	if (stylesheet.isEmpty()) {
+		stylesheet = DEFAULT_STYLESHEET;
+		prefs.putString("stylesheet", stylesheet);
+	}
 
-  if (!connectToWiFi()) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    WiFi.disconnect(true, true);  // Wipe credentials or it looks like it won't work!
-    wpsSetup();
-    checkWifiConnectionFlag = false;
-  }
+	if (!connectToWiFi()) {
+		digitalWrite(LED_BUILTIN, HIGH);
+		WiFi.disconnect(true, true);  // Wipe credentials or it looks like it won't work!
+		wpsSetup();
+		checkWifiConnectionFlag = false;
+	}
 
-  if (overallAverageHumidity > humidityThresholdLower && overallAverageHumidity < humidityThresholdUpper)
-    pumpCycleIndex = 1; // In case of being between the two thresholds on startup skip the long pumping run and start directly with the short ones
+	if (overallAverageHumidity > humidityThresholdLower && overallAverageHumidity < humidityThresholdUpper)
+		pumpCycleIndex = 1; // In case of being between the two thresholds on startup skip the long pumping run and start directly with the short ones
 }
 
 void loop() {
-  if (startOfMainLoopMillis == 0)
-    startOfMainLoopMillis = millis();  // For averaging stuff warmup phase
+	if (startOfMainLoopMillis == 0)
+		startOfMainLoopMillis = millis();  // For averaging stuff warmup phase
 
-  if (serialDebug && !serialDebugActive) {  // Only initialize once
-    Serial.begin(115200);
-    serialDebugActive = true;
-  }
+	if (serialDebug && !serialDebugActive) {  // Only initialize once
+		Serial.begin(115200);
+		serialDebugActive = true;
+	}
 
-  debugln(DEBUG_TRACE, __LINE__);
-  webServerReaction();
-  debugln(DEBUG_TRACE, __LINE__);
+	debugln(DEBUG_TRACE, __LINE__);
+	webServerReaction();
+	debugln(DEBUG_TRACE, __LINE__);
 
-  overallAverageHumidity = 0;
-  int sensorcount = 0;
-  for (int v = 0; v < sensorPortTotalNumber; v++) {
-    if (activeSensor[v]) {
-      averageHumidity[v] = averageHumidity[v] * .98 + analogRead(sensorPort[v]) * .02;
-      overallAverageHumidity += mapf(averageHumidity[v], sensorDryHumidity[v], sensorWetHumidity[v], 0, 100);
-      sensorcount++;
-    }
-  }
-  // BUG-05 fix: guard against division by zero if all sensors are somehow inactive.
-  if (sensorcount > 0)
-    overallAverageHumidity /= sensorcount;
+	overallAverageHumidity = 0;
+	int numberOfActiveSensors = 0;
+	for (int v = 0; v < sensorPortTotalNumber; v++) {
+		if (activeSensor[v]) {
+			int rawValue = analogRead(sensorPort[v]);
+			if (rawValue < 0 || rawValue > 1023) {
+				debugln(DEBUG_ERROR, "Invalid sensor reading on GPIO " + String(sensorPort[v]) + ": " + String(rawValue));
+				continue;  // Skip invalid reading
+			}
+			averageHumidity[v] = averageHumidity[v] * .98 + rawValue * .02;
+			overallAverageHumidity += mapf(averageHumidity[v], sensorDryHumidity[v], sensorWetHumidity[v], 0, 100);
+			numberOfActiveSensors++;
+		}
+	}
+	if (numberOfActiveSensors > 0) {
+		overallAverageHumidity /= numberOfActiveSensors;
+	} else {
+		overallAverageHumidity = 100;  // Fallback to wet if no sensors so we don't flood the room
+		debugln(DEBUG_ERROR, "No active sensors available");
+	}
 
-  debugln(DEBUG_TRACE, __LINE__);
+	debugln(DEBUG_TRACE, __LINE__);
 
-  unsigned long currentMillis = millis();
-  // Pump mode hysteresis for mold prevention - only check for switching down after pump cooldown!
-  if (!humidityThresholdHysteresisFalling && overallAverageHumidity >= humidityThresholdUpper && (lastPumpStartMillis == 0 || currentMillis > lastPumpStartMillis + (pumpCycleIndex <= 1 ? pumpDelay1InMinutes : pumpDelayNInMinutes) * 60000)) {
-    debugln(DEBUG_TRACE, __LINE__);
-    debugln(DEBUG_INFO, "Average humidity (" + String(overallAverageHumidity) + ") is equal to or above upper threshold (" + String(humidityThresholdUpper) + "), switching to falling mode");
-    humidityThresholdHysteresisFalling = true;
-  } else if (humidityThresholdHysteresisFalling && overallAverageHumidity <= humidityThresholdLower) {
-    debugln(DEBUG_TRACE, __LINE__);
-    debugln(DEBUG_INFO, "Average humidity (" + String(overallAverageHumidity) + ") is equal to or below lower threshold (" + String(humidityThresholdLower) + "), switching to rising mode");
-    humidityThresholdHysteresisFalling = false;
-    pumpCycleIndex = 0;
-  }
+	unsigned long currentMillis = millis();
+	// Pump mode hysteresis for mold prevention - only check for switching down after pump cooldown!
+	if (!humidityThresholdHysteresisFalling && overallAverageHumidity >= humidityThresholdUpper && (lastPumpStartMillis == 0 || currentMillis > lastPumpStartMillis + (pumpCycleIndex <= 1 ? pumpDelay1InMinutes : pumpDelayNInMinutes) * 60000)) {
+		debugln(DEBUG_TRACE, __LINE__);
+		debugln(DEBUG_INFO, "Average humidity (" + String(overallAverageHumidity) + ") is equal to or above upper threshold (" + String(humidityThresholdUpper) + "), switching to falling mode");
+		humidityThresholdHysteresisFalling = true;
+	} else if (humidityThresholdHysteresisFalling && overallAverageHumidity <= humidityThresholdLower) {
+		debugln(DEBUG_TRACE, __LINE__);
+		debugln(DEBUG_INFO, "Average humidity (" + String(overallAverageHumidity) + ") is equal to or below lower threshold (" + String(humidityThresholdLower) + "), switching to rising mode");
+		humidityThresholdHysteresisFalling = false;
+		pumpCycleIndex = 0;
+	}
 
-  currentMillis = millis();
-  if (abs(lastOverallAverageHumidity - overallAverageHumidity) >= .5 && currentMillis - startOfMainLoopMillis > 5000) {  // Only after average warmup
-    debugln(DEBUG_TRACE, __LINE__);
-    doStatusReporting();
-    lastOverallAverageHumidity = overallAverageHumidity;
-  }
+	currentMillis = millis();
+	if (abs(lastOverallAverageHumidity - overallAverageHumidity) >= .5 && currentMillis - startOfMainLoopMillis > 5000) {  // Only after average warmup
+		debugln(DEBUG_TRACE, __LINE__);
+		doStatusReporting();
+		lastOverallAverageHumidity = overallAverageHumidity;
+	}
 
-  currentMillis = millis();
-  if (currentMillis - lastMillis60s > 60000) {
-    debugln(DEBUG_TRACE, __LINE__);
-    if (checkWifiConnectionFlag) {
-      debugln(DEBUG_TRACE, __LINE__);
-      doCheckWiFiConnection();
-      debugln(DEBUG_VERBOSE, getAvgValues());
-    }
-    lastMillis60s += 60000;
-  }
+	currentMillis = millis();
+	if (currentMillis - lastMillis60s > 60000) {
+		debugln(DEBUG_TRACE, __LINE__);
+		if (checkWifiConnectionFlag) {
+			debugln(DEBUG_TRACE, __LINE__);
+			doCheckWiFiConnection();
+			debugln(DEBUG_VERBOSE, getAvgValues());
+		}
+		lastMillis60s += 60000;
+	}
 
-  currentMillis = millis();
-  if (startPumpMillis == 0 && !humidityThresholdHysteresisFalling && overallAverageHumidity < humidityThresholdUpper && currentMillis - startOfMainLoopMillis > 5000 && (lastPumpStartMillis == 0 || currentMillis > lastPumpStartMillis + (pumpCycleIndex <= 1 ? pumpDelay1InMinutes : pumpDelayNInMinutes) * 60000)) {  // Only after average warmup
-    debugln(DEBUG_TRACE, __LINE__);
-    pumpCycleIndex++;  // Increase before pumping starts or log output, or log output will be wrong
-    debugln(DEBUG_INFO, "Average humidity (" + String(overallAverageHumidity) + ") is lower than upper threshold (" + String(humidityThresholdUpper) + "), starting pump for " + String(pumpCycleIndex <= 1 ? pumpRuntime1InSeconds : pumpRuntimeNInSeconds) + " seconds");
-    startPump();
-  }
+	currentMillis = millis();
+	if (startPumpMillis == 0 && !humidityThresholdHysteresisFalling && overallAverageHumidity < humidityThresholdUpper && currentMillis - startOfMainLoopMillis > 5000 && (lastPumpStartMillis == 0 || currentMillis > lastPumpStartMillis + (pumpCycleIndex <= 1 ? pumpDelay1InMinutes : pumpDelayNInMinutes) * 60000)) {  // Only after average warmup
+		debugln(DEBUG_TRACE, __LINE__);
+		pumpCycleIndex++;  // Increase before pumping starts or log output, or log output will be wrong
+		debugln(DEBUG_INFO, "Average humidity (" + String(overallAverageHumidity) + ") is lower than upper threshold (" + String(humidityThresholdUpper) + "), starting pump for " + String(pumpCycleIndex <= 1 ? pumpRuntime1InSeconds : pumpRuntimeNInSeconds) + " seconds");
+		startPump();
+	}
 
-  if (currentPumpCurrentValue > 0) {
-    debugln(DEBUG_TRACE, __LINE__);
-    debugln(DEBUG_VERBOSE, String(currentPumpCurrentValue) + " mA");
-  }
+	if (currentPumpCurrentValue > 0) {
+		debugln(DEBUG_TRACE, __LINE__);
+		debugln(DEBUG_VERBOSE, String(currentPumpCurrentValue) + " mA");
+	}
 
-  currentMillis = millis();
-  if (startPumpMillis != 0 && (currentMillis - startPumpMillis > (pumpCycleIndex <= 1 ? pumpRuntime1InSeconds : pumpRuntimeNInSeconds) * 1000 || currentMillis < startPumpMillis)) {  // Force switch off pump in case of timer overflow (every ~52 days)
-    stopPump();
-    debugln(DEBUG_TRACE, __LINE__);
-    debugln(DEBUG_INFO, "Average current: " + String(currentPumpCurrentValue) + " mA");
-    lastPumpCurrentValue = currentPumpCurrentValue;
-    if (currentPumpCurrentValue < dryWetPumpBorderValue) {
-      debugln(DEBUG_TRACE, __LINE__);
-      debugln(DEBUG_WARN, "Average current (" + String(currentPumpCurrentValue) + ") is lower than threshold (" + String(dryWetPumpBorderValue) + "), reporting water is empty");
-      doEmptyWaterWarning();
-    }
-  }
+	currentMillis = millis();
+	if (startPumpMillis != 0 && (currentMillis - startPumpMillis > (pumpCycleIndex <= 1 ? pumpRuntime1InSeconds : pumpRuntimeNInSeconds) * 1000 || currentMillis < startPumpMillis)) {  // Force switch off pump in case of timer overflow (every ~52 days)
+		stopPump();
+		debugln(DEBUG_TRACE, __LINE__);
+		if (currentPumpCurrentValue >= 0) {  // Valid current value
+			debugln(DEBUG_INFO, "Average current: " + String(currentPumpCurrentValue) + " mA");
+			lastPumpCurrentValue = currentPumpCurrentValue;
+			if (currentPumpCurrentValue < dryWetPumpBorderValue) {
+				debugln(DEBUG_TRACE, __LINE__);
+				debugln(DEBUG_WARN, "Average current (" + String(currentPumpCurrentValue) + ") is lower than threshold (" + String(dryWetPumpBorderValue) + "), reporting water is empty");
+				doEmptyWaterWarning();
+			}
+		} else {
+			debugln(DEBUG_ERROR, "Invalid pump current value: " + String(currentPumpCurrentValue));
+		}
+	}
 
-  for (int t = 0; t < 20; t++) {
-    currentPumpCurrentValue = currentPumpCurrentValue * .99 + (analogRead(PUMP_CURRENT_GPIO_NUMBER) * PUMP_CURRENT_MULTIPLIER) * .01;
-    delay(1);
-  }
+	for (int t = 0; t < 20; t++) {
+		int rawCurrent = analogRead(PUMP_CURRENT_GPIO_NUMBER);
+		if (rawCurrent < 0 || rawCurrent > 1023) {
+			debugln(DEBUG_ERROR, "Invalid pump current reading: " + String(rawCurrent));
+			continue;
+		}
+		currentPumpCurrentValue = currentPumpCurrentValue * .99 + (rawCurrent * PUMP_CURRENT_MULTIPLIER) * .01;
+		delay(1);
+	}
 
-  currentMillis = millis();
-  delay(startPumpMillis == 0 && currentMillis - refreshPagesMillis > 5000 ? 300 : 2);  // React quickly on startup and page load as well as when pump is running
+	currentMillis = millis();
+	delay(startPumpMillis == 0 && currentMillis - refreshPagesMillis > 5000 ? 300 : 2);  // React quickly on startup and page load as well as when pump is running
 }
 
 /**
@@ -407,25 +429,25 @@ void loop() {
  * Thread-safety: main task only.
  */
 void doEmptyWaterWarning() {
-  debugln(DEBUG_TRACE, __LINE__);
-  if (emptyWaterURL == "" || emptyWaterURL == DEFAULT_URL_EMPTY) {
-    debugln(DEBUG_VERBOSE, "Empty water supply url not set, aborting");
-    return;
-  }
-  if (WiFi.status() == WL_CONNECTED) {
-    debugln(DEBUG_VERBOSE, "Request: " + emptyWaterURL);
-    HTTPClient http;
-    http.begin(String(emptyWaterURL));
-    http.setTimeout(5000);  // IMP-01: explicit 5 s timeout; avoids blocking pump control loop.
-    int httpResponseCode = http.GET();
-    // BUG-04 fix: use String() to force string concatenation instead of pointer arithmetic.
-    debugln(DEBUG_VERBOSE, String("Response: ") + httpResponseCode);
-    if (httpResponseCode != 200)
-      debugln(DEBUG_ERROR, "doEmptyWaterWarning response code: " + http.getString());
-    http.end();
-  } else {
-    debugln(DEBUG_WARN, "WiFi Disconnected");
-  }
+	debugln(DEBUG_TRACE, __LINE__);
+	if (emptyWaterURL == "" || emptyWaterURL == DEFAULT_URL_EMPTY) {
+		debugln(DEBUG_VERBOSE, "Empty water supply url not set, aborting");
+		return;
+	}
+	if (WiFi.status() == WL_CONNECTED) {
+		debugln(DEBUG_VERBOSE, "Request: " + emptyWaterURL);
+		HTTPClient http;
+		http.setConnectTimeout(5000);  // 5s connect timeout
+		http.setTimeout(5000);         // 5s response timeout
+		http.begin(String(emptyWaterURL));
+		int httpResponseCode = http.GET();
+		debugln(DEBUG_VERBOSE, String("Response: ") + httpResponseCode);
+		if (httpResponseCode != 200)
+			debugln(DEBUG_ERROR, "doEmptyWaterWarning response code: " + http.getString());
+		http.end();
+	} else {
+		debugln(DEBUG_WARN, "WiFi Disconnected");
+	}
 }
 
 /**
@@ -437,27 +459,27 @@ void doEmptyWaterWarning() {
  * Thread-safety: main task only.
  */
 void doStatusReporting() {
-  debugln(DEBUG_TRACE, __LINE__);
-  if (reportURL == "" || reportURL == DEFAULT_URL_STATUS) {
-    debugln(DEBUG_VERBOSE, "Status url not set, aborting");
-    return;
-  }
-  if (WiFi.status() == WL_CONNECTED) {
-    String tmpReportUrl = reportURL + "?oah=" + String(overallAverageHumidity) + "&t1=" + String(humidityThresholdUpper) + "&t2=" + String(humidityThresholdLower);
-    debugln(DEBUG_VERBOSE, "Request: " + tmpReportUrl);
-    HTTPClient http;
-    http.begin(tmpReportUrl);
-    http.setTimeout(5000);  // IMP-01: explicit 5 s timeout; avoids blocking pump control loop.
-    int httpResponseCode = http.GET();
-    // BUG-04 fix: use String() to force string concatenation instead of pointer arithmetic.
-    debugln(DEBUG_VERBOSE, String("Response: ") + httpResponseCode);
-    if (httpResponseCode != 200) {
-      debugln(DEBUG_ERROR, "doStatusReporting response code: " + http.getString());
-    }
-    http.end();
-  } else {
-    debugln(DEBUG_WARN, "WiFi Disconnected");
-  }
+	debugln(DEBUG_TRACE, __LINE__);
+	if (reportURL == "" || reportURL == DEFAULT_URL_STATUS) {
+		debugln(DEBUG_VERBOSE, "Status url not set, aborting");
+		return;
+	}
+	if (WiFi.status() == WL_CONNECTED) {
+		String tmpReportUrl = reportURL + "?oah=" + String(overallAverageHumidity) + "&t1=" + String(humidityThresholdUpper) + "&t2=" + String(humidityThresholdLower);
+		debugln(DEBUG_VERBOSE, "Request: " + tmpReportUrl);
+		HTTPClient http;
+		http.setConnectTimeout(5000);  // 5s connect timeout
+		http.setTimeout(5000);         // 5s response timeout
+		http.begin(tmpReportUrl);
+		int httpResponseCode = http.GET();
+		debugln(DEBUG_VERBOSE, String("Response: ") + httpResponseCode);
+		if (httpResponseCode != 200) {
+			debugln(DEBUG_ERROR, "doStatusReporting response code: " + http.getString());
+		}
+		http.end();
+	} else {
+		debugln(DEBUG_WARN, "WiFi Disconnected");
+	}
 }
 
 /**
@@ -468,16 +490,16 @@ void doStatusReporting() {
  * @return Arduino String containing the array.
  */
 String getAvgValues() {
-  debugln(DEBUG_TRACE, __LINE__);
-  char buffer[7];
-  String retVal = "[";
-  for (int v = 0; v < sensorPortTotalNumber; v++) {
-    dtostrf(averageHumidity[v], 1, 1, buffer);
-    retVal += buffer;
-    if (v < sensorPortTotalNumber - 1)
-      retVal += ",";
-  }
-  return retVal + "]";
+	debugln(DEBUG_TRACE, __LINE__);
+	char buffer[7];
+	String retVal = "[";
+	for (int v = 0; v < sensorPortTotalNumber; v++) {
+		dtostrf(averageHumidity[v], 1, 1, buffer);
+		retVal += buffer;
+		if (v < sensorPortTotalNumber - 1)
+			retVal += ",";
+	}
+	return retVal + "]";
 }
 
 /**
@@ -488,10 +510,10 @@ String getAvgValues() {
  * Thread-safety: main task only.
  */
 void startPump() {
-  debugln(DEBUG_INFO, "Starting Pump, run " + String(pumpCycleIndex) + " in cycle");
-  digitalWrite(PUMP_ACTIVE_GPIO_NUMBER, LOW);
-  startPumpMillis = millis();
-  lastPumpStartMillis = startPumpMillis;
+	debugln(DEBUG_INFO, "Starting Pump, run " + String(pumpCycleIndex) + " in cycle");
+	digitalWrite(PUMP_ACTIVE_GPIO_NUMBER, LOW);
+	startPumpMillis = millis();
+	lastPumpStartMillis = startPumpMillis;
 }
 
 /**
@@ -501,9 +523,9 @@ void startPump() {
  * Thread-safety: main task only.
  */
 void stopPump() {
-  debugln(DEBUG_INFO, "Stopping Pump, run " + String(pumpCycleIndex) + " in cycle");
-  digitalWrite(PUMP_ACTIVE_GPIO_NUMBER, HIGH);
-  startPumpMillis = 0;
+	debugln(DEBUG_INFO, "Stopping Pump, run " + String(pumpCycleIndex) + " in cycle");
+	digitalWrite(PUMP_ACTIVE_GPIO_NUMBER, HIGH);
+	startPumpMillis = 0;
 }
 
 /**
@@ -515,49 +537,55 @@ void stopPump() {
  */
 // Will only be called from setup() once and in loop IF no connection
 bool connectToWiFi() {
-  // BUG-03 fix: prefs.getString() returns "" for missing keys, never NULL.
-  // Use .isEmpty() instead of == NULL to avoid undefined behaviour in String::compareTo.
-  if (!ssid.isEmpty() && !pwd.isEmpty()) {
-    debugln(DEBUG_INFO, "Connecting to SSID: " + ssid);
-    WiFi.begin(ssid, pwd);
-    for (int t = 0; t < 20; t++) {  // Try for 20 seconds
-      if (WiFi.status() == WL_CONNECTED)
-        break;
-      delay(1000);
-      debug(DEBUG_INFO, ".");
-    }
-    debugln(DEBUG_INFO, "");
-  }
+	// prefs.getString() returns "" for missing keys, never NULL.
+	// Use .isEmpty() instead of == NULL to avoid undefined behaviour in String::compareTo.
+	if (!ssid.isEmpty() && !pwd.isEmpty()) {
+		debugln(DEBUG_INFO, "Connecting to SSID: " + ssid);
+		WiFi.begin(ssid, pwd);
+		for (int t = 0; t < 20; t++) {  // Try for 20 seconds
+			if (WiFi.status() == WL_CONNECTED)
+				break;
+			delay(1000);
+			debug(DEBUG_INFO, ".");
+		}
+		debugln(DEBUG_INFO, "");
+	}
 
-  // Try the values from the "ssidAndPassword.h" file
-  if (WiFi.status() != WL_CONNECTED) {
-    debugln(DEBUG_INFO, "Connecting to SSID: " + wifiName);
-    WiFi.begin(wifiName, wifiPassword);
-    for (int t = 0; t < 20; t++) {  // Try for 20 seconds
-      if (WiFi.status() == WL_CONNECTED) {
-        ssid = wifiName;
-        prefs.putString("ssid", ssid);
-        pwd = wifiPassword;
-        prefs.putString("password", pwd);
-        break;
-      }
-      delay(1000);
-      debug(DEBUG_INFO, ".");
-    }
-    debugln(DEBUG_INFO, "");
-  }
+	// Try the values from the "ssidAndPassword.h" file
+	if (WiFi.status() != WL_CONNECTED) {
+		debugln(DEBUG_INFO, "Connecting to SSID: " + wifiName);
+		WiFi.begin(wifiName, wifiPassword);
+		for (int t = 0; t < 20; t++) {  // Try for 20 seconds
+			if (WiFi.status() == WL_CONNECTED) {
+				ssid = wifiName;
+				prefs.putString("ssid", ssid);
+				pwd = wifiPassword;
+				prefs.putString("password", pwd);
+				break;
+			}
+			delay(1000);
+			debug(DEBUG_INFO, ".");
+		}
+		debugln(DEBUG_INFO, "");
+	}
 
-  if (WiFi.status() == WL_CONNECTED) {
-    debugln(DEBUG_VERBOSE, "Connected: " + WiFi.localIP().toString());
-    server.begin();
-    configTime(NTP_GMT_OFFSET_SEC, NTP_DAYLIGHT_OFFSET_SEC, NTP_SERVER);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(100);
-    digitalWrite(LED_BUILTIN, LOW);
-    return true;
-  } else {
-    return false;
-  }
+	if (WiFi.status() == WL_CONNECTED) {
+		debugln(DEBUG_VERBOSE, "Connected: " + WiFi.localIP().toString());
+		server.begin();
+		configTime(NTP_GMT_OFFSET_SEC, NTP_DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+		struct tm timeinfo;
+		if (!getLocalTime(&timeinfo)) {
+			debugln(DEBUG_WARN, "NTP sync failed, time may be inaccurate");
+		} else {
+			debugln(DEBUG_VERBOSE, "NTP sync successful");
+		}
+		digitalWrite(LED_BUILTIN, HIGH);
+		delay(100);
+		digitalWrite(LED_BUILTIN, LOW);
+		return true;
+	} else {
+		return false;
+	}
 }
 
 /**
@@ -567,11 +595,11 @@ bool connectToWiFi() {
  * Thread-safety: main task only.
  */
 void doCheckWiFiConnection() {
-  debugln(DEBUG_TRACE, __LINE__);
-  if (WiFi.status() != WL_CONNECTED) {
-    debugln(DEBUG_WARN, "Connection lost, reconnecting...");
-    connectToWiFi();
-  }
+	debugln(DEBUG_TRACE, __LINE__);
+	if (WiFi.status() != WL_CONNECTED) {
+		debugln(DEBUG_WARN, "Connection lost, reconnecting...");
+		connectToWiFi();
+	}
 }
 
 #define ESP_WPS_MODE WPS_TYPE_PBC
@@ -583,90 +611,90 @@ void doCheckWiFiConnection() {
 static esp_wps_config_t config;
 
 void wpsInitConfig() {
-  config.wps_type = ESP_WPS_MODE;
-  strcpy(config.factory_info.manufacturer, ESP_MANUFACTURER);
-  strcpy(config.factory_info.model_number, ESP_MODEL_NUMBER);
-  strcpy(config.factory_info.model_name, ESP_MODEL_NAME);
-  strcpy(config.factory_info.device_name, ESP_DEVICE_NAME);
+	config.wps_type = ESP_WPS_MODE;
+	strcpy(config.factory_info.manufacturer, ESP_MANUFACTURER);
+	strcpy(config.factory_info.model_number, ESP_MODEL_NUMBER);
+	strcpy(config.factory_info.model_name, ESP_MODEL_NAME);
+	strcpy(config.factory_info.device_name, ESP_DEVICE_NAME);
 }
 
 void wpsStart() {
-  if (esp_wifi_wps_enable(&config)) {
-    debugln(DEBUG_ERROR, "WPS Enable Failed");
-  } else if (esp_wifi_wps_start(0)) {
-    debugln(DEBUG_ERROR, "WPS Start Failed");
-  }
+	if (esp_wifi_wps_enable(&config)) {
+		debugln(DEBUG_ERROR, "WPS Enable Failed");
+	} else if (esp_wifi_wps_start(0)) {
+		debugln(DEBUG_ERROR, "WPS Start Failed");
+	}
 }
 
 void wpsStop() {
-  if (esp_wifi_wps_disable()) {
-    debugln(DEBUG_ERROR, "WPS Disable Failed");
-  }
+	if (esp_wifi_wps_disable()) {
+		debugln(DEBUG_ERROR, "WPS Disable Failed");
+	}
 }
 
 String wpspin2string(uint8_t a[]) {
-  char wps_pin[9];
-  for (int i = 0; i < 8; i++) {
-    wps_pin[i] = a[i];
-  }
-  wps_pin[8] = '\0';
-  return (String)wps_pin;
+	char wps_pin[9];
+	for (int i = 0; i < 8; i++) {
+		wps_pin[i] = a[i];
+	}
+	wps_pin[8] = '\0';
+	return (String)wps_pin;
 }
 
 /**
  * @brief WiFi and WPS event handler — called from a separate FreeRTOS task.
  *
  * @warning Accesses shared globals (ssid, pwd, checkWifiConnectionFlag, debugBuffer*).
- *          These accesses are not mutex-protected (BUG-06); checkWifiConnectionFlag is
+ *          These accesses are not mutex-protected; checkWifiConnectionFlag is
  *          declared volatile as a minimum guard.
  * @param event  WiFi event type.
  * @param info   Event-specific payload.
  */
 // WARNING: WiFiEvent is called from a separate FreeRTOS task (thread)!
 void WiFiEvent(WiFiEvent_t event, arduino_event_info_t info) {
-  debugln(DEBUG_TRACE, __LINE__);
-  switch (event) {
-    case ARDUINO_EVENT_WIFI_STA_START:
-      debugln(DEBUG_INFO, "Station Mode Started");
-      break;
-    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-      debugln(DEBUG_INFO, "Connecting to SSID: " + WiFi.SSID());
-      // BUG-07 fix: PSK must not be stored in the HTTP-accessible debug buffer.
-      ssid = WiFi.SSID();
-      pwd = WiFi.psk();
-      prefs.putString("ssid", ssid);
-      prefs.putString("password", pwd);
-      debugln(DEBUG_VERBOSE, "Success: " + WiFi.localIP().toString());
-      digitalWrite(LED_BUILTIN, LOW);
-      checkWifiConnectionFlag = true;
-      server.begin();
-      break;
-    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-      debugln(DEBUG_WARN, "Disconnected from station, attempting reconnection");
-      WiFi.reconnect();
-      break;
-    case ARDUINO_EVENT_WPS_ER_SUCCESS:
-      debugln(DEBUG_INFO, "WPS Successful, stopping WPS and connecting to: " + WiFi.SSID());
-      wpsStop();
-      delay(10);
-      WiFi.begin();
-      break;
-    case ARDUINO_EVENT_WPS_ER_FAILED:
-      debugln(DEBUG_WARN, "WPS Failed, retrying");
-      wpsStop();
-      wpsStart();
-      break;
-    case ARDUINO_EVENT_WPS_ER_TIMEOUT:
-      debugln(DEBUG_WARN, "WPS Timedout, retrying");
-      wpsStop();
-      wpsStart();
-      break;
-    case ARDUINO_EVENT_WPS_ER_PIN:
-      debugln(DEBUG_DEBUG, "WPS_PIN = " + wpspin2string(info.wps_er_pin.pin_code));
-      break;
-    default:
-      break;
-  }
+	debugln(DEBUG_TRACE, __LINE__);
+	switch (event) {
+		case ARDUINO_EVENT_WIFI_STA_START:
+			debugln(DEBUG_INFO, "Station Mode Started");
+			break;
+		case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+			debugln(DEBUG_INFO, "Connecting to SSID: " + WiFi.SSID());
+			// PSK must not be stored in the HTTP-accessible debug buffer.
+			ssid = WiFi.SSID();
+			pwd = WiFi.psk();
+			prefs.putString("ssid", ssid);
+			prefs.putString("password", pwd);
+			debugln(DEBUG_VERBOSE, "Success: " + WiFi.localIP().toString());
+			digitalWrite(LED_BUILTIN, LOW);
+			checkWifiConnectionFlag = true;
+			server.begin();
+			break;
+		case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+			debugln(DEBUG_WARN, "Disconnected from station, attempting reconnection");
+			WiFi.reconnect();
+			break;
+		case ARDUINO_EVENT_WPS_ER_SUCCESS:
+			debugln(DEBUG_INFO, "WPS Successful, stopping WPS and connecting to: " + WiFi.SSID());
+			wpsStop();
+			delay(10);
+			WiFi.begin();
+			break;
+		case ARDUINO_EVENT_WPS_ER_FAILED:
+			debugln(DEBUG_WARN, "WPS Failed, retrying");
+			wpsStop();
+			wpsStart();
+			break;
+		case ARDUINO_EVENT_WPS_ER_TIMEOUT:
+			debugln(DEBUG_WARN, "WPS Timedout, retrying");
+			wpsStop();
+			wpsStart();
+			break;
+		case ARDUINO_EVENT_WPS_ER_PIN:
+			debugln(DEBUG_DEBUG, "WPS_PIN = " + wpspin2string(info.wps_er_pin.pin_code));
+			break;
+		default:
+			break;
+	}
 }
 
 /**
@@ -679,545 +707,545 @@ void WiFiEvent(WiFiEvent_t event, arduino_event_info_t info) {
  * Thread-safety: main task only.
  */
 void webServerReaction() {
-  debugln(DEBUG_TRACE, __LINE__);
-  WiFiClient client = server.accept();
-  if (client) {
-    String currentLine = "";
-    int contentLength, lineLength;
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        if (c != '\n' && c != '\r')
-          lineLength++;
-        if (page == PAGE_DEFAULT_POST2 && contentLength == lineLength) {
-          currentLine += c;  // Normally done at end of routine but we need it here already!
-          c = '\n';          // A POST request does not send a LF at the end of the request so we need to simulate this!
-        }
-        if (c == '\n') {
-          debugln(DEBUG_DEBUG, "## " + currentLine);
-          if (currentLine.substring(0, currentLine.indexOf(":")).equalsIgnoreCase("content-length")) {
-            contentLength = currentLine.substring(currentLine.indexOf(":") + 1).toInt();
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Content-length found: " + contentLength);
-          } else if (currentLine.startsWith("GET /H?")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Humidity value block: " + currentLine);
-            page = PAGE_HUMIDITYVAL;
-            subpage = currentLine.substring(strlen("GET /H?")).toInt();
-          } else if (currentLine.startsWith("GET /H")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Humidity all values block: " + currentLine);
-            page = PAGE_HUMIDITYVAL;
-            subpage = -1;
-          } else if (currentLine.startsWith("GET /M")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Current hysteresis mode: " + currentLine);
-            page = PAGE_MODE;
-          } else if (currentLine.startsWith("GET /jq.js")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> JQuery file: " + currentLine);
-            page = PAGE_JQUERY;
-          } else if (currentLine.startsWith("GET /s.css")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Style file: " + currentLine);
-            page = PAGE_STYLE;
-          } else if (currentLine.startsWith("GET /d.css")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Day Style file: " + currentLine);
-            page = PAGE_DSTYLE;
-            stylesheet = "d.css";
-            prefs.putString("stylesheet", stylesheet);
-          } else if (currentLine.startsWith("GET /n.css")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Night Style file: " + currentLine);
-            page = PAGE_NSTYLE;
-            stylesheet = "n.css";
-            prefs.putString("stylesheet", stylesheet);
-          } else if (currentLine.startsWith("GET /S")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Switch hysteresis direction: " + currentLine);
-            humidityThresholdHysteresisFalling = !humidityThresholdHysteresisFalling;
-          } else if (currentLine.startsWith("GET /O")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Average humidity block: " + currentLine);
-            page = PAGE_HUMIDITY;
-          } else if (currentLine.startsWith("GET /P")) {  // BUG-08 fix: removed duplicate GET /M branch that was dead code.
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Pump current block: " + currentLine);
-            page = PAGE_PUMPVAL;
-          } else if (currentLine.startsWith("GET /T")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Pump test activate: " + currentLine);
-            startPump();
-          } else if (currentLine.startsWith("GET /E")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Empty test activate: " + currentLine);
-            doEmptyWaterWarning();
-          } else if (currentLine.startsWith("GET /R")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Report test activate: " + currentLine);
-            doStatusReporting();
-          } else if (currentLine.startsWith("GET /Da")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Debug main page: " + currentLine);
-            page = PAGE_DEBUG;
-            refreshPagesMillis = millis();
-          } else if (currentLine.startsWith("GET /Db")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Debug body (part): " + currentLine);
-            page = PAGE_DEBUG_BODY_PART;
-          } else if (currentLine.startsWith("GET /Dc")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Debug body (full): " + currentLine);
-            page = PAGE_DEBUG_BODY_FULL;
-          } else if (currentLine.startsWith("POST /")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Post page 1: " + currentLine);
-            page = PAGE_DEFAULT_POST1;
-          } else if (page == PAGE_DEFAULT_POST2) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Post page 3");
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Saving default config page: " + currentLine);
-            for (int v = 0; v < sensorPortTotalNumber; v++) {
-              char portname[10];  // gpioXX\0 gpiodryXX\0 gpiowetXX\0
-              (String("gpio") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
-              activeSensor[v] = currentLine.indexOf(portname) != -1;
-              prefs.putBool(portname, activeSensor[v]);
+	debugln(DEBUG_TRACE, __LINE__);
+	WiFiClient client = server.accept();
+	if (client) {
+		String currentLine = "";
+		int contentLength, lineLength;
+		while (client.connected()) {
+			if (client.available()) {
+				char c = client.read();
+				if (c != '\n' && c != '\r')
+					lineLength++;
+				if (page == PAGE_DEFAULT_POST2 && contentLength == lineLength) {
+					currentLine += c;  // Normally done at end of routine but we need it here already!
+					c = '\n';          // A POST request does not send a LF at the end of the request so we need to simulate this!
+				}
+				if (c == '\n') {
+					debugln(DEBUG_DEBUG, "## " + currentLine);
+					if (currentLine.substring(0, currentLine.indexOf(":")).equalsIgnoreCase("content-length")) {
+						contentLength = currentLine.substring(currentLine.indexOf(":") + 1).toInt();
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Content-length found: " + contentLength);
+					} else if (currentLine.startsWith("GET /H?")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Humidity value block: " + currentLine);
+						page = PAGE_HUMIDITYVAL;
+						subpage = currentLine.substring(strlen("GET /H?")).toInt();
+					} else if (currentLine.startsWith("GET /H")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Humidity all values block: " + currentLine);
+						page = PAGE_HUMIDITYVAL;
+						subpage = -1;
+					} else if (currentLine.startsWith("GET /M")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Current hysteresis mode: " + currentLine);
+						page = PAGE_MODE;
+					} else if (currentLine.startsWith("GET /jq.js")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> JQuery file: " + currentLine);
+						page = PAGE_JQUERY;
+					} else if (currentLine.startsWith("GET /s.css")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Style file: " + currentLine);
+						page = PAGE_STYLE;
+					} else if (currentLine.startsWith("GET /d.css")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Day Style file: " + currentLine);
+						page = PAGE_DSTYLE;
+						stylesheet = "d.css";
+						prefs.putString("stylesheet", stylesheet);
+					} else if (currentLine.startsWith("GET /n.css")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Night Style file: " + currentLine);
+						page = PAGE_NSTYLE;
+						stylesheet = "n.css";
+						prefs.putString("stylesheet", stylesheet);
+					} else if (currentLine.startsWith("GET /S")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Switch hysteresis direction: " + currentLine);
+						humidityThresholdHysteresisFalling = !humidityThresholdHysteresisFalling;
+					} else if (currentLine.startsWith("GET /O")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Average humidity block: " + currentLine);
+						page = PAGE_HUMIDITY;
+					} else if (currentLine.startsWith("GET /P")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Pump current block: " + currentLine);
+						page = PAGE_PUMPVAL;
+					} else if (currentLine.startsWith("GET /T")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Pump test activate: " + currentLine);
+						startPump();
+					} else if (currentLine.startsWith("GET /E")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Empty test activate: " + currentLine);
+						doEmptyWaterWarning();
+					} else if (currentLine.startsWith("GET /R")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Report test activate: " + currentLine);
+						doStatusReporting();
+					} else if (currentLine.startsWith("GET /Da")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Debug main page: " + currentLine);
+						page = PAGE_DEBUG;
+						refreshPagesMillis = millis();
+					} else if (currentLine.startsWith("GET /Db")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Debug body (part): " + currentLine);
+						page = PAGE_DEBUG_BODY_PART;
+					} else if (currentLine.startsWith("GET /Dc")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Debug body (full): " + currentLine);
+						page = PAGE_DEBUG_BODY_FULL;
+					} else if (currentLine.startsWith("POST /")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Post page 1: " + currentLine);
+						page = PAGE_DEFAULT_POST1;
+					} else if (page == PAGE_DEFAULT_POST2) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Post page 3");
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Saving default config page: " + currentLine);
+						for (int v = 0; v < sensorPortTotalNumber; v++) {
+							char portname[10];  // gpioXX\0 gpiodryXX\0 gpiowetXX\0
+							(String("gpio") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
+							activeSensor[v] = currentLine.indexOf(portname) != -1;
+							prefs.putBool(portname, activeSensor[v]);
 
-              (String("gpiodry") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
-              sensorDryHumidity[v] = currentLine.substring(currentLine.indexOf(portname) + strlen(portname) + 1).toInt();
-              prefs.putInt(portname, sensorDryHumidity[v]);
+							(String("gpiodry") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
+							sensorDryHumidity[v] = currentLine.substring(currentLine.indexOf(portname) + strlen(portname) + 1).toInt();
+							prefs.putInt(portname, sensorDryHumidity[v]);
 
-              (String("gpiowet") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
-              sensorWetHumidity[v] = currentLine.substring(currentLine.indexOf(portname) + strlen(portname) + 1).toInt();
-              prefs.putInt(portname, sensorWetHumidity[v]);
+							(String("gpiowet") + String(sensorPort[v])).toCharArray(portname, sizeof(portname));
+							sensorWetHumidity[v] = currentLine.substring(currentLine.indexOf(portname) + strlen(portname) + 1).toInt();
+							prefs.putInt(portname, sensorWetHumidity[v]);
 
-              refreshPagesMillis = millis();
-            }
+							refreshPagesMillis = millis();
+						}
 
-            humidityThresholdUpper = currentLine.substring(currentLine.indexOf("threshold1") + String("threshold1").length() + 1).toInt();
-            humidityThresholdUpper = humidityThresholdUpper <= 0 ? 1 : (humidityThresholdUpper >= 100 ? 99 : humidityThresholdUpper);
-            prefs.putInt("threshold1", humidityThresholdUpper);
+						humidityThresholdUpper = currentLine.substring(currentLine.indexOf("threshold1") + String("threshold1").length() + 1).toInt();
+						humidityThresholdUpper = humidityThresholdUpper <= 0 ? 1 : (humidityThresholdUpper >= 100 ? 99 : humidityThresholdUpper);
+						prefs.putInt("threshold1", humidityThresholdUpper);
 
-            humidityThresholdLower = currentLine.substring(currentLine.indexOf("threshold2") + String("threshold2").length() + 1).toInt();
-            humidityThresholdLower = humidityThresholdLower <= 0 ? 1 : (humidityThresholdLower >= 100 ? 99 : humidityThresholdLower);
-            prefs.putInt("threshold2", humidityThresholdLower);
+						humidityThresholdLower = currentLine.substring(currentLine.indexOf("threshold2") + String("threshold2").length() + 1).toInt();
+						humidityThresholdLower = humidityThresholdLower <= 0 ? 1 : (humidityThresholdLower >= 100 ? 99 : humidityThresholdLower);
+						prefs.putInt("threshold2", humidityThresholdLower);
 
-            pumpRuntime1InSeconds = currentLine.substring(currentLine.indexOf("pumptime1") + String("pumptime1").length() + 1).toDouble();
-            pumpRuntime1InSeconds = pumpRuntime1InSeconds <= 0 ? 1 : (pumpRuntime1InSeconds > 300 ? 300 : pumpRuntime1InSeconds);
-            prefs.putDouble("pumptime1", pumpRuntime1InSeconds);
+						pumpRuntime1InSeconds = currentLine.substring(currentLine.indexOf("pumptime1") + String("pumptime1").length() + 1).toDouble();
+						pumpRuntime1InSeconds = pumpRuntime1InSeconds <= 0 ? 1 : (pumpRuntime1InSeconds > 300 ? 300 : pumpRuntime1InSeconds);
+						prefs.putDouble("pumptime1", pumpRuntime1InSeconds);
 
-            pumpDelay1InMinutes = currentLine.substring(currentLine.indexOf("pumpdelay1") + String("pumpdelay1").length() + 1).toInt();
-            pumpDelay1InMinutes = pumpDelay1InMinutes <= 0 ? 1 : (pumpDelay1InMinutes > 1440 ? 1440 : pumpDelay1InMinutes);
-            prefs.putInt("pumpdelay1", pumpDelay1InMinutes);
+						pumpDelay1InMinutes = currentLine.substring(currentLine.indexOf("pumpdelay1") + String("pumpdelay1").length() + 1).toInt();
+						pumpDelay1InMinutes = pumpDelay1InMinutes <= 0 ? 1 : (pumpDelay1InMinutes > 1440 ? 1440 : pumpDelay1InMinutes);
+						prefs.putInt("pumpdelay1", pumpDelay1InMinutes);
 
-            pumpRuntimeNInSeconds = currentLine.substring(currentLine.indexOf("pumptimeN") + String("pumptimeN").length() + 1).toDouble();
-            pumpRuntimeNInSeconds = pumpRuntimeNInSeconds <= 0 ? 1 : (pumpRuntimeNInSeconds > 300 ? 300 : pumpRuntimeNInSeconds);
-            prefs.putDouble("pumptimeN", pumpRuntimeNInSeconds);
+						pumpRuntimeNInSeconds = currentLine.substring(currentLine.indexOf("pumptimeN") + String("pumptimeN").length() + 1).toDouble();
+						pumpRuntimeNInSeconds = pumpRuntimeNInSeconds <= 0 ? 1 : (pumpRuntimeNInSeconds > 300 ? 300 : pumpRuntimeNInSeconds);
+						prefs.putDouble("pumptimeN", pumpRuntimeNInSeconds);
 
-            pumpDelayNInMinutes = currentLine.substring(currentLine.indexOf("pumpdelayN") + String("pumpdelayN").length() + 1).toInt();
-            pumpDelayNInMinutes = pumpDelayNInMinutes <= 0 ? 1 : (pumpDelayNInMinutes > 1440 ? 1440 : pumpDelayNInMinutes);
-            prefs.putInt("pumpdelayN", pumpDelayNInMinutes);
+						pumpDelayNInMinutes = currentLine.substring(currentLine.indexOf("pumpdelayN") + String("pumpdelayN").length() + 1).toInt();
+						pumpDelayNInMinutes = pumpDelayNInMinutes <= 0 ? 1 : (pumpDelayNInMinutes > 1440 ? 1440 : pumpDelayNInMinutes);
+						prefs.putInt("pumpdelayN", pumpDelayNInMinutes);
 
-            dryWetPumpBorderValue = currentLine.substring(currentLine.indexOf("drypump") + String("drypump").length() + 1).toInt();
-            dryWetPumpBorderValue = dryWetPumpBorderValue <= 0 ? 1 : (dryWetPumpBorderValue >= 1023 ? 1022 : dryWetPumpBorderValue);
-            prefs.putInt("drypump", dryWetPumpBorderValue);
+						dryWetPumpBorderValue = currentLine.substring(currentLine.indexOf("drypump") + String("drypump").length() + 1).toInt();
+						dryWetPumpBorderValue = dryWetPumpBorderValue <= 0 ? 1 : (dryWetPumpBorderValue >= 1023 ? 1022 : dryWetPumpBorderValue);
+						prefs.putInt("drypump", dryWetPumpBorderValue);
 
-            int start, a, b;
-            URLCode url;
+						int start, a, b;
+						URLCode url;
 
-            start = currentLine.indexOf("emptyUrl") + String("emptyUrl").length() + 1;
-            a = currentLine.indexOf("&", start);
-            b = currentLine.indexOf(" ", start);
-            a = a == -1 ? 99999 : a;
-            b = b == -1 ? 99999 : b;
-            url.urlcode = currentLine.substring(start, min(a, b));
-            url.urldecode();
-            emptyWaterURL = url.strcode;
-            prefs.putString("emptyUrl", emptyWaterURL);
+						start = currentLine.indexOf("emptyUrl") + String("emptyUrl").length() + 1;
+						a = currentLine.indexOf("&", start);
+						b = currentLine.indexOf(" ", start);
+						a = a == -1 ? 99999 : a;
+						b = b == -1 ? 99999 : b;
+						url.urlcode = currentLine.substring(start, min(a, b));
+						url.urldecode();
+						emptyWaterURL = url.strcode;
+						prefs.putString("emptyUrl", emptyWaterURL);
 
-            start = currentLine.indexOf("reportURL") + String("reportURL").length() + 1;
-            a = currentLine.indexOf("&", start);
-            b = currentLine.indexOf(" ", start);
-            a = a == -1 ? 99999 : a;
-            b = b == -1 ? 99999 : b;
-            url.urlcode = currentLine.substring(start, min(a, b));
-            url.urldecode();
-            reportURL = url.strcode;
-            prefs.putString("reportURL", reportURL);
+						start = currentLine.indexOf("reportURL") + String("reportURL").length() + 1;
+						a = currentLine.indexOf("&", start);
+						b = currentLine.indexOf(" ", start);
+						a = a == -1 ? 99999 : a;
+						b = b == -1 ? 99999 : b;
+						url.urlcode = currentLine.substring(start, min(a, b));
+						url.urldecode();
+						reportURL = url.strcode;
+						prefs.putString("reportURL", reportURL);
 
-            debugLevel = currentLine.substring(currentLine.indexOf("debugLevel") + String("debugLevel").length() + 1).toInt();
-            debugLevel = debugLevel < DEBUG_ERROR ? DEBUG_ERROR : (debugLevel > DEBUG_TRACE ? DEBUG_TRACE : debugLevel);
-            prefs.putInt("debugLevel", debugLevel);
+						debugLevel = currentLine.substring(currentLine.indexOf("debugLevel") + String("debugLevel").length() + 1).toInt();
+						debugLevel = debugLevel < DEBUG_ERROR ? DEBUG_ERROR : (debugLevel > DEBUG_TRACE ? DEBUG_TRACE : debugLevel);
+						prefs.putInt("debugLevel", debugLevel);
 
-            serialDebug = currentLine.indexOf("serialDebug") != -1;
+						serialDebug = currentLine.indexOf("serialDebug") != -1;
 
-            page = PAGE_DEFAULT;
-            currentLine = "";
-          } else if (currentLine.startsWith("GET /")) {
-            debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Default config page: " + currentLine);
-            refreshPagesMillis = millis();  // Clean main page
-          }
+						page = PAGE_DEFAULT;
+						currentLine = "";
+					} else if (currentLine.startsWith("GET /")) {
+						debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Default config page: " + currentLine);
+						refreshPagesMillis = millis();  // Clean main page
+					}
 
-          if (currentLine.length() == 0) {
-            if (page == PAGE_DEFAULT_POST1) {
-              debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Post page 2");
-              page = PAGE_DEFAULT_POST2;
-            } else {
-              client.println("HTTP/1.1 200 OK");
-              if (page == PAGE_HUMIDITYVAL) {
-                client.println("Content-type:application/json;charset=utf-8");
-                client.println();
-                if (subpage >= 0 && subpage < sensorPortTotalNumber)
-                  client.println(averageHumidity[subpage]);
-                else
-                  client.println(getAvgValues());
-              } else if (page == PAGE_HUMIDITY) {
-                client.println("Content-type:application/json;charset=utf-8");
-                client.println();
-                client.println(overallAverageHumidity);
-              } else if (page == PAGE_MODE) {
-                client.println("Content-type:text/plain;charset=utf-8");
-                client.println();
-                client.print(humidityThresholdHysteresisFalling ? "Falling" : "Rising");
-              } else if (page == PAGE_PUMPVAL) {
-                client.println("Content-type:application/json;charset=utf-8");
-                client.println();
-                client.print(lastPumpCurrentValue);
-              } else if (page == PAGE_JQUERY) {
-                client.println("Content-type:application/javascript;charset=utf-8");
-                client.println("Pragma: public");
-                client.println("Cache-Control: public, max-age=36000;");
-                client.println("Last-Modified: Wed, 25 Jun 2025 11:21:08 GMT");
-                client.print("Content-Length: ");
-                client.println(gJQuerySize);
-                client.println();
-                client.println(gJQueryData);
-              } else if (page == PAGE_STYLE) {
-                client.println("Content-type:text/css;charset=utf-8");
-                client.println("Pragma: public");
-                client.println("Cache-Control: public, max-age=36000;");
-                client.println("Last-Modified: Wed, 25 Jun 2025 11:21:08 GMT");
-                client.print("Content-Length: ");
-                client.println(gStyleSize);
-                client.println();
-                client.println(gStyleData);
-              } else if (page == PAGE_DSTYLE) {
-                client.println("Content-type:text/css;charset=utf-8");
-                client.println("Pragma: public");
-                client.println("Cache-Control: public, max-age=36000;");
-                client.println("Last-Modified: Wed, 25 Jun 2025 11:21:08 GMT");
-                client.print("Content-Length: ");
-                client.println(gDStyleSize);
-                client.println();
-                client.println(gDStyleData);
-              } else if (page == PAGE_NSTYLE) {
-                client.println("Content-type:text/css;charset=utf-8");
-                client.println("Pragma: public");
-                client.println("Cache-Control: public, max-age=36000;");
-                client.println("Last-Modified: Wed, 25 Jun 2025 11:21:08 GMT");
-                client.print("Content-Length: ");
-                client.println(gNStyleSize);
-                client.println();
-                client.println(gNStyleData);
-              } else if (page == PAGE_DEBUG) {
-                client.println("Content-type:text/html;charset=utf-8");
-                client.println();
-                client.println("<html><head><script src=\"jq.js\"></script><script>function go(){"
-                               "y=$(document).height()-window.pageYOffset-window.innerHeight;"
-                               "$.get(\"/Db\",function(x){"
-                               "$('#d').append(x);"
-                               "if(y<30)$(\"html,body\").animate({scrollTop:$(document).height()},\"slow\")"
-                               "});"
-                               "setTimeout(go,5000)"
-                               "}$(document).ready(function(){$('#d').load(\"/Dc\",go())})</script></head><body style=\"background:#020;color:#0f0\"><pre id=\"d\"></pre></body></html>");
-              } else if (page == PAGE_DEBUG_BODY_FULL) {
-                client.println("Content-type:text/plain;charset=utf-8");
-                client.println();
-                for (int t = 0; t < DEBUG_BUFFER_SIZE; t++) {
-                  const int idx = (debugBufferIndexNextEmpty + t) % DEBUG_BUFFER_SIZE;
-                  if (debugBufferArray[idx] != "")
-                    client.println(debugBufferArray[idx]);
-                }
-                debugBufferIndexLastShown = debugBufferIndexNextEmpty;
-              } else if (page == PAGE_DEBUG_BODY_PART) {
-                client.println("Content-type:text/plain;charset=utf-8");
-                client.println();
-                const int used = (debugBufferIndexNextEmpty + DEBUG_BUFFER_SIZE - debugBufferIndexLastShown) % DEBUG_BUFFER_SIZE;
-                for (int t = 0; t < used; t++)
-                  client.println(debugBufferArray[(debugBufferIndexLastShown + t) % DEBUG_BUFFER_SIZE]);
-                debugBufferIndexLastShown = debugBufferIndexNextEmpty;
-              } else {
-                client.println("Content-type:text/html;charset=utf-8");
-                client.println();
-                client.println("<!DOCTYPE html>");
-                client.println("<html>");
-                client.println("<head>");
-                client.println("	<meta http-equiv=\"content-type\" content=\"text/html; charset=UTF-8\">");
-                client.println("	<meta charset=\"utf-8\">");
-                client.println("	<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
-                client.println("	<link rel=\"stylesheet\" href=\"s.css\">");
-                client.println("	<link rel=\"stylesheet\" href=\"" + String(stylesheet) + "\">");
-                client.println("	<meta name=\"robots\" content=\"noindex, follow\">");
-                client.println("	<script src=\"jq.js\"></script>");
-                client.println("	<script>");
-                client.println("		function a() {");
-                client.println("			$(\"#pc\").load(\"/P\");");
-                client.println("			$(\"#ho\").load(\"/O\");");
-                client.println("			$(\"#mo\").load(\"/M\");");
-                for (int v = 0; v < sensorPortTotalNumber; v++) {
-                  client.println("			$(\"#h" + String(sensorPort[v]) + "\").load(\"/H?" + String(v) + "\");");
-                }
-                client.println("			setTimeout(a, 10000);");
-                client.println("		}");
-                client.println("		$(document).ready(function(){a()});");
-                client.println("	</script>");
-                client.println("</head>");
-                client.println("<body>");
-                client.println("	<form method=\"post\" action=\"/\">");
-                client.println("		<div class=\"outer\">");
-                client.println("			<div class=\"inner\">");
-                client.println("				<div class=\"panel\">");
-                client.println("					<label>Sensors</label>");
-                for (int v = 0; v < sensorPortTotalNumber; v++) {
-                  client.println("					<div class=\"form-group\">");
-                  client.println("						<div class=\"form-group\">");
-                  client.println("							<div class=\"form-wrapper\">");
-                  client.println("								<label>GPIO</label>");
-                  client.println("								<span class=\"form-control checkbox\">");
-                  client.println("									<label>");
-                  client.println("										<nobr><input type=\"checkbox\" name=\"gpio" + String(sensorPort[v]) + "\" value=\"1\" " + String(activeSensor[v] ? " checked" : "") + "> " + String(sensorPort[v]) + "</nobr>");
-                  client.println("									</label>");
-                  client.println("								</span>");
-                  client.println("							</div>");
-                  client.println("						</div>");
-                  client.println("						<div class=\"form-wrapper\" title=\"Absolute sensor value when clean and surrounded by air\">");
-                  client.println("							<label>Dry</label>");
-                  client.println("							<input class=\"form-control\" name=\"gpiodry" + String(sensorPort[v]) + "\" size=\"5\" value=\"" + String(sensorDryHumidity[v]) + "\">");
-                  client.println("						</div>");
-                  client.println("						<div class=\"form-wrapper\" title=\"Absolute sensor value when submerged in water\">");
-                  client.println("							<label>Wet</label>");
-                  client.println("							<input class=\"form-control\" name=\"gpiowet" + String(sensorPort[v]) + "\" size=\"5\" value=\"" + String(sensorWetHumidity[v]) + "\"></td>");
-                  client.println("						</div>");
-                  client.println("						<div class=\"form-group\">");
-                  client.println("							<div class=\"form-wrapper\">");
-                  client.println("								<label>Now</label>");
-                  client.println("								<span class=\"form-control\" id=\"h" + String(sensorPort[v]) + "\">X</span>");
-                  client.println("							</div>");
-                  client.println("						</div>");
-                  client.println("					</div>");
-                }
-                client.println("				</div>");
-                client.println("				<div class=\"panel\">");
-                client.println("					<label>Trigger Levels</label>");
-                client.println("					<div class=\"form-group\">");
-                client.println("						<div class=\"form-wrapper\" title=\"When reaching or exceeding this humidity level cyclic pumping will be deactivated for mold prevention until the lower level is reached.\">");
-                client.println("							<label>Upper hysteresis level (%)</label>");
-                client.println("							<input class=\"form-control\" name=\"threshold1\" size=\"5\" value=\"" + String(humidityThresholdUpper) + "\">");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\" title=\"When reaching or undercutting this humidity level cyclic pumping will be activated until the upper level is reached.\">");
-                client.println("							<label>Lower hysteresis level (%)</label>");
-                client.println("							<input class=\"form-control\" name=\"threshold2\" size=\"5\" value=\"" + String(humidityThresholdLower) + "\">");
-                client.println("						</div>");
-                client.println("						<div class=\"form-group\">");
-                client.println("							<div class=\"form-wrapper\" title=\"The current relative humidity level\">");
-                client.println("								<label>Now (%)</label>");
-                client.println("								<span class=\"form-control\" id=\"ho\">X</span>");
-                client.println("							</div>");
-                client.println("							<div class=\"form-wrapper\" title=\"Shows on which leg of the hysteresis loop the system currently is running on\">");
-                client.println("								<label>Mode</label>");
-                client.println("								<span class=\"form-control\" id=\"mo\">X</span>");
-                client.println("							</div>");
-                client.println("							<!--div class=\"form-wrapper\">");
-                client.println("								<a href=\"/S\" class=\"smallbutton\">");
-                client.println("									<div class=\"smallbutton-wrapper\">");
-                client.println("										Switch");
-                client.println("									</div>");
-                client.println("								</a>");
-                client.println("							</div-->");
-                client.println("						</div>");
-                client.println("					</div>");
-                client.println("					<div class=\"form-group\">");
-                client.println("						<div class=\"form-wrapper\" title=\"Time the pump will be activated on the first activation per pump cycle, in seconds.\">");
-                client.println("							<label>First pump runtime (s)</label>");
-                client.println("							<input class=\"form-control\" name=\"pumptime1\" size=\"5\" value=\"" + String(pumpRuntime1InSeconds) + "\">");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\" title=\"Delay between the first and the second pump activation per cycle (not including pump test), in minutes.\">");
-                client.println("							<label>First pump delay (m)</label>");
-                client.println("							<input class=\"form-control\" name=\"pumpdelay1\" size=\"5\" value=\"" + String(pumpDelay1InMinutes) + "\">");
-                client.println("						</div>");
-                client.println("					</div>");
-                client.println("					<div class=\"form-group\">");
-                client.println("						<div class=\"form-wrapper\" title=\"Time the pump will be activated for the second and all following pump activations per cycle (or when testing), in seconds.\">");
-                client.println("							<label>Other pump runtimes (s)</label>");
-                client.println("							<input class=\"form-control\" name=\"pumptimeN\" size=\"5\" value=\"" + String(pumpRuntimeNInSeconds) + "\">");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\" title=\"Minimum delay between the starts of two pump activations (not including pump test), in minutes.\">");
-                client.println("							<label>Other pump delays (m)</label>");
-                client.println("							<input class=\"form-control\" name=\"pumpdelayN\" size=\"5\" value=\"" + String(pumpDelayNInMinutes) + "\">");
-                client.println("						</div>");
-                client.println("					</div>");
-                client.println("					<div class=\"form-group\">");
-                client.println("						<div class=\"form-wrapper\" title=\"This value determines if the water supply is empty. It does so by measuring the electric current of the pump which is way lower when no water is pumped. Set this value to somewhere in between the current when pumping water and when running dry in milliamperes.\">");
-                client.println("							<label>Water detection (mA)</label>");
-                client.println("							<input class=\"form-control\" name=\"drypump\" size=\"5\" value=\"" + String(dryWetPumpBorderValue) + "\">");
-                client.println("						</div>");
-                client.println("						<div class=\"form-group\">");
-                client.println("							<div class=\"form-wrapper\">");
-                client.println("								<label>Last (mA)</label>");
-                client.println("								<span class=\"form-control\" id=\"pc\">X</span>");
-                client.println("							</div>");
-                client.println("							<div class=\"form-wrapper\">");
-                client.println("								<a href=\"/T\" class=\"smallbutton\">");
-                client.println("									<div class=\"smallbutton-wrapper\">");
-                client.println("										Test");
-                client.println("									</div>");
-                client.println("								</a>");
-                client.println("							</div>");
-                client.println("						</div>");
-                client.println("					</div>");
-                client.println("				</div>");
-                client.println("				<div class=\"panel\">");
-                client.println("					<label>Reporting URLs</label>");
-                client.println("					<div class=\"form-group\">");
-                client.println("						<div class=\"form-wrapper\" title=\"This URL will be called when there is no more water and the pump is running dry.\">");
-                client.println("							<label>Empty warning to (URL)</label>");
-                client.println("							<input class=\"form-control\" name=\"emptyUrl\" maxlength=\"255\" size=\"40\" value=\"" + String(emptyWaterURL) + "\">");
-                client.println("						</div>");
-                client.println("						<div class=\"form-group\">");
-                client.println("							<div class=\"form-wrapper\">");
-                client.println("								<a href=\"/E\" class=\"smallbutton\">");
-                client.println("									<div class=\"smallbutton-wrapper\">");
-                client.println("										Test");
-                client.println("									</div>");
-                client.println("								</a>");
-                client.println("							</div>");
-                client.println("						</div>");
-                client.println("					</div>");
-                client.println("					<div class=\"form-group\">");
-                client.println("						<div class=\"form-wrapper\" title=\"This URL will be called cyclically to send the current humidity value to e.g. a database.\">");
-                client.println("							<label>Status reports to (URL)</label>");
-                client.println("							<input class=\"form-control\" name=\"reportURL\" maxlength=\"255\" size=\"40\" value=\"" + String(reportURL) + "\">");
-                client.println("						</div>");
-                client.println("						<div class=\"form-group\">");
-                client.println("							<div class=\"form-wrapper\">");
-                client.println("								<a href=\"/R\" class=\"smallbutton\">");
-                client.println("									<div class=\"smallbutton-wrapper\">");
-                client.println("										Test");
-                client.println("									</div>");
-                client.println("								</a>");
-                client.println("							</div>");
-                client.println("						</div>");
-                client.println("					</div>");
-                client.println("				</div>");
-                client.println("				<div class=\"panel\">");
-                client.println("					<label>Debugging</label>");
-                client.println("					<div class=\"form-group\">");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<label>Debug Level</label>");
-                client.println("							<select class=\"form-control\" name=\"debugLevel\">");
-                client.println("							<option value=\"" + String(DEBUG_ERROR) + "\" " + (debugLevel == DEBUG_ERROR ? " selected=\"true\"" : "") + ">Error</option>");
-                client.println("							<option value=\"" + String(DEBUG_WARN) + "\" " + (debugLevel == DEBUG_WARN ? " selected=\"true\"" : "") + ">Warn</option>");
-                client.println("							<option value=\"" + String(DEBUG_INFO) + "\" " + (debugLevel == DEBUG_INFO ? " selected=\"true\"" : "") + ">Info</option>");
-                client.println("							<option value=\"" + String(DEBUG_VERBOSE) + "\" " + (debugLevel == DEBUG_VERBOSE ? " selected=\"true\"" : "") + ">Verbose</option>");
-                client.println("							<option value=\"" + String(DEBUG_DEBUG) + "\" " + (debugLevel == DEBUG_DEBUG ? " selected=\"true\"" : "") + ">Debug</option>");
-                client.println("							<option value=\"" + String(DEBUG_TRACE) + "\" " + (debugLevel == DEBUG_TRACE ? " selected=\"true\"" : "") + ">Trace</option>");
-                client.println("							</select>");
-                client.println("						</div>");
-                client.println("						<div class=\"form-group\">");
-                client.println("							<div class=\"form-wrapper\" title=\"Debugging informationen will be transmitted additionally to the serial interface using 115200 Baud.\">");
-                client.println("								<label>Serial Debug</label>");
-                client.println("								<span class=\"form-control checkbox\">");
-                client.println("									<label>");
-                client.println("										<nobr><input type=\"checkbox\" name=\"serialDebug\" value=\"1\"" + String(serialDebug ? " checked" : "") + "> Active</nobr>");
-                client.println("									</label>");
-                client.println("								</span>");
-                client.println("							</div>");
-                client.println("						</div>");
-                client.println("					</div>");
-                client.println("				</div>");
-                client.println("				<div class=\"panel\">");
-                client.println("					<div class=\"form-wrapper\">");
-                client.println("						<button>");
-                client.println("							<input type=\"submit\" value=\"save\">");
-                client.println("							Save");
-                client.println("						</button>");
-                client.println("					</div>");
-                client.println("				</div>");
-                client.println("				<div class=\"panel\">");
-                client.println("					<label>Additional Pages</label>");
-                client.println("					<div class=\"form-group\">");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<a href=\"/H\" class=\"smallbutton\">");
-                client.println("								<div class=\"smallbutton-wrapper\">");
-                client.println("									Sensor Values");
-                client.println("								</div>");
-                client.println("							</a>");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<a href=\"/O\" class=\"smallbutton\">");
-                client.println("								<div class=\"smallbutton-wrapper\">");
-                client.println("									Average Humidity");
-                client.println("								</div>");
-                client.println("							</a>");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<a href=\"/M\" class=\"smallbutton\">");
-                client.println("								<div class=\"smallbutton-wrapper\">");
-                client.println("									Hysteresis Mode");
-                client.println("								</div>");
-                client.println("							</a>");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<a href=\"/P\" class=\"smallbutton\">");
-                client.println("								<div class=\"smallbutton-wrapper\">");
-                client.println("									Pump Current");
-                client.println("								</div>");
-                client.println("							</a>");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<a href=\"/jq.js\" class=\"smallbutton\">");
-                client.println("								<div class=\"smallbutton-wrapper\">");
-                client.println("									JQuery");
-                client.println("								</div>");
-                client.println("							</a>");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<a href=\"/s.css\" class=\"smallbutton\">");
-                client.println("								<div class=\"smallbutton-wrapper\">");
-                client.println("									Main Stylesheet");
-                client.println("								</div>");
-                client.println("							</a>");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<a href=\"/d.css\" class=\"smallbutton\">");
-                client.println("								<div class=\"smallbutton-wrapper\">");
-                client.println("									Stylesheet 1");
-                client.println("								</div>");
-                client.println("							</a>");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<a href=\"/n.css\" class=\"smallbutton\">");
-                client.println("								<div class=\"smallbutton-wrapper\">");
-                client.println("									Stylesheet 2");
-                client.println("								</div>");
-                client.println("							</a>");
-                client.println("						</div>");
-                client.println("						<div class=\"form-wrapper\">");
-                client.println("							<a href=\"/Da\" class=\"smallbutton\">");
-                client.println("								<div class=\"smallbutton-wrapper\">");
-                client.println("									Debug");
-                client.println("								</div>");
-                client.println("							</a>");
-                client.println("						</div>");
-                client.println("					</div>");
-                client.println("				</div>");
-                client.println("				<div class=\"footer\" align=\"center\">");
-                client.println("					<a href=\"https://github.com/Joghurt/Plantcare/\" target=\"_blank\">github.com/Joghurt/Plantcare</a>");
-                client.println("				</div>");
-                client.println("			</div>");
-                client.println("		</div>");
-                client.println("	</form>");
-                client.println("</body>");
-                client.println("</html>");
-              }
-              page = PAGE_DEFAULT;
-              break;  // Exit while() loop
-            }
-          } else {
-            currentLine = "";
-            lineLength = 0;
-          }
-        } else if (c != '\r') {
-          currentLine += c;
-        }
-      }
-    }
-    page = PAGE_DEFAULT;
-    client.stop();
-    debugln(DEBUG_DEBUG, "Client Disconnected.");
-  }
+					if (currentLine.length() == 0) {
+						if (page == PAGE_DEFAULT_POST1) {
+							debugln(DEBUG_DEBUG, client.remoteIP().toString() + " -> Post page 2");
+							page = PAGE_DEFAULT_POST2;
+						} else {
+							client.println("HTTP/1.1 200 OK");
+							if (page == PAGE_HUMIDITYVAL) {
+								client.println("Content-type:application/json;charset=utf-8");
+								client.println();
+								if (subpage >= 0 && subpage < sensorPortTotalNumber)
+									client.println(averageHumidity[subpage]);
+								else
+									client.println(getAvgValues());
+							} else if (page == PAGE_HUMIDITY) {
+								client.println("Content-type:application/json;charset=utf-8");
+								client.println();
+								client.println(overallAverageHumidity);
+							} else if (page == PAGE_MODE) {
+								client.println("Content-type:text/plain;charset=utf-8");
+								client.println();
+								client.print(humidityThresholdHysteresisFalling ? "Falling" : "Rising");
+							} else if (page == PAGE_PUMPVAL) {
+								client.println("Content-type:application/json;charset=utf-8");
+								client.println();
+								client.print(lastPumpCurrentValue);
+							} else if (page == PAGE_JQUERY) {
+								client.println("Content-type:application/javascript;charset=utf-8");
+								client.println("Pragma: public");
+								client.println("Cache-Control: public, max-age=36000;");
+								client.println("Last-Modified: Wed, 25 Jun 2025 11:21:08 GMT");
+								client.print("Content-Length: ");
+								client.println(gJQuerySize);
+								client.println();
+								client.println(gJQueryData);
+							} else if (page == PAGE_STYLE) {
+								client.println("Content-type:text/css;charset=utf-8");
+								client.println("Pragma: public");
+								client.println("Cache-Control: public, max-age=36000;");
+								client.println("Last-Modified: Wed, 25 Jun 2025 11:21:08 GMT");
+								client.print("Content-Length: ");
+								client.println(gStyleSize);
+								client.println();
+								client.println(gStyleData);
+							} else if (page == PAGE_DSTYLE) {
+								client.println("Content-type:text/css;charset=utf-8");
+								client.println("Pragma: public");
+								client.println("Cache-Control: public, max-age=36000;");
+								client.println("Last-Modified: Wed, 25 Jun 2025 11:21:08 GMT");
+								client.print("Content-Length: ");
+								client.println(gDStyleSize);
+								client.println();
+								client.println(gDStyleData);
+							} else if (page == PAGE_NSTYLE) {
+								client.println("Content-type:text/css;charset=utf-8");
+								client.println("Pragma: public");
+								client.println("Cache-Control: public, max-age=36000;");
+								client.println("Last-Modified: Wed, 25 Jun 2025 11:21:08 GMT");
+								client.print("Content-Length: ");
+								client.println(gNStyleSize);
+								client.println();
+								client.println(gNStyleData);
+							} else if (page == PAGE_DEBUG) {
+								client.println("Content-type:text/html;charset=utf-8");
+								client.println();
+								client.println("<html><head><script src=\"jq.js\"></script><script>function go(){"
+															 "y=$(document).height()-window.pageYOffset-window.innerHeight;"
+															 "$.get(\"/Db\",function(x){"
+															 "$('#d').append(x);"
+															 "if(y<30)$(\"html,body\").animate({scrollTop:$(document).height()},\"slow\")"
+															 "});"
+															 "setTimeout(go,5000)"
+															 "}$(document).ready(function(){$('#d').load(\"/Dc\",go())})</script></head><body style=\"background:#020;color:#0f0\"><pre id=\"d\"></pre></body></html>");
+							} else if (page == PAGE_DEBUG_BODY_FULL) {
+								client.println("Content-type:text/plain;charset=utf-8");
+								client.println();
+								for (int t = 0; t < DEBUG_BUFFER_SIZE; t++) {
+									const int idx = (debugBufferIndexNextEmpty + t) % DEBUG_BUFFER_SIZE;
+									if (debugBufferArray[idx] != "")
+										client.println(debugBufferArray[idx]);
+								}
+								debugBufferIndexLastShown = debugBufferIndexNextEmpty;
+							} else if (page == PAGE_DEBUG_BODY_PART) {
+								client.println("Content-type:text/plain;charset=utf-8");
+								client.println();
+								const int used = (debugBufferIndexNextEmpty + DEBUG_BUFFER_SIZE - debugBufferIndexLastShown) % DEBUG_BUFFER_SIZE;
+								for (int t = 0; t < used; t++)
+									client.println(debugBufferArray[(debugBufferIndexLastShown + t) % DEBUG_BUFFER_SIZE]);
+								debugBufferIndexLastShown = debugBufferIndexNextEmpty;
+							} else {
+								client.println("Content-type:text/html;charset=utf-8");
+								client.println();
+								client.println("<!DOCTYPE html>");
+								client.println("<html>");
+								client.println("<head>");
+								client.println("    <meta http-equiv=\"content-type\" content=\"text/html; charset=UTF-8\">");
+								client.println("    <meta charset=\"utf-8\">");
+								client.println("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
+								client.println("    <link rel=\"stylesheet\" href=\"s.css\">");
+								client.println("    <link rel=\"stylesheet\" href=\"" + String(stylesheet) + "\">");
+								client.println("    <meta name=\"robots\" content=\"noindex, follow\">");
+								client.println("    <script src=\"jq.js\"></script>");
+								client.println("    <script>");
+								client.println("        function a() {");
+								client.println("            $(\"#pc\").load(\"/P\");");
+								client.println("            $(\"#ho\").load(\"/O\");");
+								client.println("            $(\"#mo\").load(\"/M\");");
+								for (int v = 0; v < sensorPortTotalNumber; v++) {
+									client.println("            $(\"#h" + String(sensorPort[v]) + "\").load(\"/H?" + String(v) + "\");");
+								}
+								client.println("            setTimeout(a, 10000);");
+								client.println("        }");
+								client.println("        $(document).ready(function(){a()});");
+								client.println("    </script>");
+								client.println("</head>");
+								client.println("<body>");
+								client.println("    <form method=\"post\" action=\"/\">");
+								client.println("        <div class=\"outer\">");
+								client.println("            <div class=\"inner\">");
+								client.println("                <div class=\"panel\">");
+								client.println("                    <label>Sensors</label>");
+								for (int v = 0; v < sensorPortTotalNumber; v++) {
+									client.println("                    <div class=\"form-group\">");
+									client.println("                        <div class=\"form-group\">");
+									client.println("                            <div class=\"form-wrapper\">");
+									client.println("                                <label>GPIO</label>");
+									client.println("                                <span class=\"form-control checkbox\">");
+									client.println("                                    <label>");
+									client.println("                                        <nobr><input type=\"checkbox\" name=\"gpio" + String(sensorPort[v]) + "\" value=\"1\" " + String(activeSensor[v] ? " checked" : "") + "> " + String(sensorPort[v]) + "</nobr>");
+									client.println("                                    </label>");
+									client.println("                                </span>");
+									client.println("                            </div>");
+									client.println("                        </div>");
+									client.println("                        <div class=\"form-wrapper\" title=\"Absolute sensor value when clean and surrounded by air\">");
+									client.println("                            <label>Dry</label>");
+									client.println("                            <input class=\"form-control\" name=\"gpiodry" + String(sensorPort[v]) + "\" size=\"5\" value=\"" + String(sensorDryHumidity[v]) + "\">");
+									client.println("                        </div>");
+									client.println("                        <div class=\"form-wrapper\" title=\"Absolute sensor value when submerged in water\">");
+									client.println("                            <label>Wet</label>");
+									client.println("                            <input class=\"form-control\" name=\"gpiowet" + String(sensorPort[v]) + "\" size=\"5\" value=\"" + String(sensorWetHumidity[v]) + "\"></td>");
+									client.println("                        </div>");
+									client.println("                        <div class=\"form-group\">");
+									client.println("                            <div class=\"form-wrapper\">");
+									client.println("                                <label>Now</label>");
+									client.println("                                <span class=\"form-control\" id=\"h" + String(sensorPort[v]) + "\">X</span>");
+									client.println("                            </div>");
+									client.println("                        </div>");
+									client.println("                    </div>");
+								}
+								client.println("                </div>");
+								client.println("                <div class=\"panel\">");
+								client.println("                    <label>Trigger Levels</label>");
+								client.println("                    <div class=\"form-group\">");
+								client.println("                        <div class=\"form-wrapper\" title=\"When reaching or exceeding this humidity level cyclic pumping will be deactivated for mold prevention until the lower level is reached.\">");
+								client.println("                            <label>Upper hysteresis level (%)</label>");
+								client.println("                            <input class=\"form-control\" name=\"threshold1\" size=\"5\" value=\"" + String(humidityThresholdUpper) + "\">");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\" title=\"When reaching or undercutting this humidity level cyclic pumping will be activated until the upper level is reached.\">");
+								client.println("                            <label>Lower hysteresis level (%)</label>");
+								client.println("                            <input class=\"form-control\" name=\"threshold2\" size=\"5\" value=\"" + String(humidityThresholdLower) + "\">");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-group\">");
+								client.println("                            <div class=\"form-wrapper\" title=\"The current relative humidity level\">");
+								client.println("                                <label>Now (%)</label>");
+								client.println("                                <span class=\"form-control\" id=\"ho\">X</span>");
+								client.println("                            </div>");
+								client.println("                            <div class=\"form-wrapper\" title=\"Shows on which leg of the hysteresis loop the system currently is running on\">");
+								client.println("                                <label>Mode</label>");
+								client.println("                                <span class=\"form-control\" id=\"mo\">X</span>");
+								client.println("                            </div>");
+								client.println("                            <!--div class=\"form-wrapper\">");
+								client.println("                                <a href=\"/S\" class=\"smallbutton\">");
+								client.println("                                    <div class=\"smallbutton-wrapper\">");
+								client.println("                                        Switch");
+								client.println("                                    </div>");
+								client.println("                                </a>");
+								client.println("                            </div-->");
+								client.println("                        </div>");
+								client.println("                    </div>");
+								client.println("                    <div class=\"form-group\">");
+								client.println("                        <div class=\"form-wrapper\" title=\"Time the pump will be activated on the first activation per pump cycle, in seconds.\">");
+								client.println("                            <label>First pump runtime (s)</label>");
+								client.println("                            <input class=\"form-control\" name=\"pumptime1\" size=\"5\" value=\"" + String(pumpRuntime1InSeconds) + "\">");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\" title=\"Delay between the first and the second pump activation per cycle (not including pump test), in minutes.\">");
+								client.println("                            <label>First pump delay (m)</label>");
+								client.println("                            <input class=\"form-control\" name=\"pumpdelay1\" size=\"5\" value=\"" + String(pumpDelay1InMinutes) + "\">");
+								client.println("                        </div>");
+								client.println("                    </div>");
+								client.println("                    <div class=\"form-group\">");
+								client.println("                        <div class=\"form-wrapper\" title=\"Time the pump will be activated for the second and all following pump activations per cycle (or when testing), in seconds.\">");
+								client.println("                            <label>Other pump runtimes (s)</label>");
+								client.println("                            <input class=\"form-control\" name=\"pumptimeN\" size=\"5\" value=\"" + String(pumpRuntimeNInSeconds) + "\">");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\" title=\"Minimum delay between the starts of two pump activations (not including pump test), in minutes.\">");
+								client.println("                            <label>Other pump delays (m)</label>");
+								client.println("                            <input class=\"form-control\" name=\"pumpdelayN\" size=\"5\" value=\"" + String(pumpDelayNInMinutes) + "\">");
+								client.println("                        </div>");
+								client.println("                    </div>");
+								client.println("                    <div class=\"form-group\">");
+								client.println("                        <div class=\"form-wrapper\" title=\"This value determines if the water supply is empty. It does so by measuring the electric current of the pump which is way lower when no water is pumped. Set this value to somewhere in between the current when pumping water and when running dry in milliamperes.\">");
+								client.println("                            <label>Water detection (mA)</label>");
+								client.println("                            <input class=\"form-control\" name=\"drypump\" size=\"5\" value=\"" + String(dryWetPumpBorderValue) + "\">");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-group\">");
+								client.println("                            <div class=\"form-wrapper\">");
+								client.println("                                <label>Last (mA)</label>");
+								client.println("                                <span class=\"form-control\" id=\"pc\">X</span>");
+								client.println("                            </div>");
+								client.println("                            <div class=\"form-wrapper\">");
+								client.println("                                <a href=\"/T\" class=\"smallbutton\">");
+								client.println("                                    <div class=\"smallbutton-wrapper\">");
+								client.println("                                        Test");
+								client.println("                                    </div>");
+								client.println("                                </a>");
+								client.println("                            </div>");
+								client.println("                        </div>");
+								client.println("                    </div>");
+								client.println("                </div>");
+								client.println("                <div class=\"panel\">");
+								client.println("                    <label>Reporting URLs</label>");
+								client.println("                    <div class=\"form-group\">");
+								client.println("                        <div class=\"form-wrapper\" title=\"This URL will be called when there is no more water and the pump is running dry.\">");
+								client.println("                            <label>Empty warning to (URL)</label>");
+								client.println("                            <input class=\"form-control\" name=\"emptyUrl\" maxlength=\"255\" size=\"40\" value=\"" + String(emptyWaterURL) + "\">");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-group\">");
+								client.println("                            <div class=\"form-wrapper\">");
+								client.println("                                <a href=\"/E\" class=\"smallbutton\">");
+								client.println("                                    <div class=\"smallbutton-wrapper\">");
+								client.println("                                        Test");
+								client.println("                                    </div>");
+								client.println("                                </a>");
+								client.println("                            </div>");
+								client.println("                        </div>");
+								client.println("                    </div>");
+								client.println("                    <div class=\"form-group\">");
+								client.println("                        <div class=\"form-wrapper\" title=\"This URL will be called cyclically to send the current humidity value to e.g. a database.\">");
+								client.println("                            <label>Status reports to (URL)</label>");
+								client.println("                            <input class=\"form-control\" name=\"reportURL\" maxlength=\"255\" size=\"40\" value=\"" + String(reportURL) + "\">");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-group\">");
+								client.println("                            <div class=\"form-wrapper\">");
+								client.println("                                <a href=\"/R\" class=\"smallbutton\">");
+								client.println("                                    <div class=\"smallbutton-wrapper\">");
+								client.println("                                        Test");
+								client.println("                                    </div>");
+								client.println("                                </a>");
+								client.println("                            </div>");
+								client.println("                        </div>");
+								client.println("                    </div>");
+								client.println("                </div>");
+								client.println("                <div class=\"panel\">");
+								client.println("                    <label>Debugging</label>");
+								client.println("                    <div class=\"form-group\">");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <label>Debug Level</label>");
+								client.println("                            <select class=\"form-control\" name=\"debugLevel\">");
+								client.println("                            <option value=\"" + String(DEBUG_ERROR) + "\" " + (debugLevel == DEBUG_ERROR ? " selected=\"true\"" : "") + ">Error</option>");
+								client.println("                            <option value=\"" + String(DEBUG_WARN) + "\" " + (debugLevel == DEBUG_WARN ? " selected=\"true\"" : "") + ">Warn</option>");
+								client.println("                            <option value=\"" + String(DEBUG_INFO) + "\" " + (debugLevel == DEBUG_INFO ? " selected=\"true\"" : "") + ">Info</option>");
+								client.println("                            <option value=\"" + String(DEBUG_VERBOSE) + "\" " + (debugLevel == DEBUG_VERBOSE ? " selected=\"true\"" : "") + ">Verbose</option>");
+								client.println("                            <option value=\"" + String(DEBUG_DEBUG) + "\" " + (debugLevel == DEBUG_DEBUG ? " selected=\"true\"" : "") + ">Debug</option>");
+								client.println("                            <option value=\"" + String(DEBUG_TRACE) + "\" " + (debugLevel == DEBUG_TRACE ? " selected=\"true\"" : "") + ">Trace</option>");
+								client.println("                            </select>");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-group\">");
+								client.println("                            <div class=\"form-wrapper\" title=\"Debugging informationen will be transmitted additionally to the serial interface using 115200 Baud.\">");
+								client.println("                                <label>Serial Debug</label>");
+								client.println("                                <span class=\"form-control checkbox\">");
+								client.println("                                    <label>");
+								client.println("                                        <nobr><input type=\"checkbox\" name=\"serialDebug\" value=\"1\"" + String(serialDebug ? " checked" : "") + "> Active</nobr>");
+								client.println("                                    </label>");
+								client.println("                                </span>");
+								client.println("                            </div>");
+								client.println("                        </div>");
+								client.println("                    </div>");
+								client.println("                </div>");
+								client.println("                <div class=\"panel\">");
+								client.println("                    <div class=\"form-wrapper\">");
+								client.println("                        <button>");
+								client.println("                            <input type=\"submit\" value=\"save\">");
+								client.println("                            Save");
+								client.println("                        </button>");
+								client.println("                    </div>");
+								client.println("                </div>");
+								client.println("                <div class=\"panel\">");
+								client.println("                    <label>Additional Pages</label>");
+								client.println("                    <div class=\"form-group\">");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <a href=\"/H\" class=\"smallbutton\">");
+								client.println("                                <div class=\"smallbutton-wrapper\">");
+								client.println("                                    Sensor Values");
+								client.println("                                </div>");
+								client.println("                            </a>");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <a href=\"/O\" class=\"smallbutton\">");
+								client.println("                                <div class=\"smallbutton-wrapper\">");
+								client.println("                                    Average Humidity");
+								client.println("                                </div>");
+								client.println("                            </a>");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <a href=\"/M\" class=\"smallbutton\">");
+								client.println("                                <div class=\"smallbutton-wrapper\">");
+								client.println("                                    Hysteresis Mode");
+								client.println("                                </div>");
+								client.println("                            </a>");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <a href=\"/P\" class=\"smallbutton\">");
+								client.println("                                <div class=\"smallbutton-wrapper\">");
+								client.println("                                    Pump Current");
+								client.println("                                </div>");
+								client.println("                            </a>");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <a href=\"/jq.js\" class=\"smallbutton\">");
+								client.println("                                <div class=\"smallbutton-wrapper\">");
+								client.println("                                    JQuery");
+								client.println("                                </div>");
+								client.println("                            </a>");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <a href=\"/s.css\" class=\"smallbutton\">");
+								client.println("                                <div class=\"smallbutton-wrapper\">");
+								client.println("                                    Main Stylesheet");
+								client.println("                                </div>");
+								client.println("                            </a>");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <a href=\"/d.css\" class=\"smallbutton\">");
+								client.println("                                <div class=\"smallbutton-wrapper\">");
+								client.println("                                    Stylesheet 1");
+								client.println("                                </div>");
+								client.println("                            </a>");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <a href=\"/n.css\" class=\"smallbutton\">");
+								client.println("                                <div class=\"smallbutton-wrapper\">");
+								client.println("                                    Stylesheet 2");
+								client.println("                                </div>");
+								client.println("                            </a>");
+								client.println("                        </div>");
+								client.println("                        <div class=\"form-wrapper\">");
+								client.println("                            <a href=\"/Da\" class=\"smallbutton\">");
+								client.println("                                <div class=\"smallbutton-wrapper\">");
+								client.println("                                    Debug");
+								client.println("                                </div>");
+								client.println("                            </a>");
+								client.println("                        </div>");
+								client.println("                    </div>");
+								client.println("                </div>");
+								client.println("                <div class=\"footer\" align=\"center\">");
+								client.println("                    <a href=\"https://github.com/Joghurt/Plantcare/\" target=\"_blank\">github.com/Joghurt/Plantcare</a>");
+								client.println("                </div>");
+								client.println("            </div>");
+								client.println("        </div>");
+								client.println("    </form>");
+								client.println("</body>");
+								client.println("</html>");
+							}
+							page = PAGE_DEFAULT;
+							break;  // Exit while() loop
+						}
+					} else {
+						currentLine = "";
+						lineLength = 0;
+					}
+				} else if (c != '\r') {
+					currentLine += c;
+				}
+			}
+		}
+		page = PAGE_DEFAULT;
+		client.stop();
+		debugln(DEBUG_DEBUG, "Client Disconnected.");
+	}
 }
 
 /**
@@ -1227,10 +1255,10 @@ void webServerReaction() {
  * The WiFiEvent callback stores credentials and calls server.begin() on success.
  */
 void wpsSetup() {
-  WiFi.onEvent(WiFiEvent);  // Will call WiFiEvent() from another thread.
-  WiFi.mode(WIFI_MODE_STA);
-  debugln(DEBUG_INFO, "Starting WPS");
-  wpsInitConfig();
-  delay(1000);
-  wpsStart();
+	WiFi.onEvent(WiFiEvent);  // Will call WiFiEvent() from another thread.
+	WiFi.mode(WIFI_MODE_STA);
+	debugln(DEBUG_INFO, "Starting WPS");
+	wpsInitConfig();
+	delay(1000);
+	wpsStart();
 }

@@ -45,6 +45,17 @@ debug log page.
 | Runtime dependency | `jquery-3.7.1.min.js` — download separately (see below) |
 | Tested hardware | WEMOS D1 MINI ESP32 |
 
+### Known Issues
+
+In case you're using Linux or any other case sensitive operating system you may need to edit Arduino/libraries/URLCode/src/URLCode.h and change
+```
+#include <String.h>
+```
+to lower case
+```
+#include <string.h>
+```
+
 ---
 
 ## Hardware
@@ -92,13 +103,9 @@ INSERT INTO Config VALUES ('Threshold1', '70'), ('Threshold2', '50');
 
 ### WiFi credentials
 
-Edit `ssidAndPassword.h` with your SSID and password **or** use WPS push-button mode
-(the ESP switches to WPS automatically 40 s after a failed connection attempt).
+Rename `ssidAndPassword.example.h` to `ssidAndPassword.h` and insert your SSID and password or use
+WPS push-button mode (the ESP switches to WPS automatically 40 seconds after a failed connection attempt).
 Credentials entered via WPS or the web UI are persisted in ESP32 NVS.
-
-> **Security note:** Do not commit real credentials to a public repository.
-> The file `ssidAndPassword.h` is intentionally kept as a plaintext fallback for
-> environments without WPS.  Consider adding it to `.gitignore`.
 
 ### Runtime settings (web UI)
 
@@ -207,7 +214,7 @@ php -l empty.php
 ```
 Plantcare/
 ├── Plantcare.ino          # ESP32 firmware (main sketch)
-├── ssidAndPassword.h      # WiFi fallback credentials (do not commit real passwords)
+├── ssidAndPassword.example.h  # WiFi fallback credentials example
 ├── jquery-3.7.1.min.js    # jQuery (download separately, not in repo)
 ├── s.css                  # Base stylesheet (served by ESP32)
 ├── d.css                  # Day theme stylesheet
@@ -215,7 +222,6 @@ Plantcare/
 ├── index.php              # Optional: humidity chart (Chart.js, PHP backend)
 ├── status.php             # Optional: telemetry receiver endpoint
 ├── empty.php              # Optional: empty-tank notification endpoint
-├── CHANGELOG.md           # Change history
 ├── README.md              # This file
 └── LICENSE
 ```
